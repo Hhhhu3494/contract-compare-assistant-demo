@@ -166,6 +166,20 @@
   .t-src-mine{background:#FFF7E8;color:var(--risk-mid);border:1px solid #FFD9A8;}
   .src-nw,.time-nw{white-space:nowrap;}
   .time-nw{color:var(--ink-2);font-size:12px;}
+
+  /* ===== 指标切换 tab 与标题同行 ===== */
+  .sec-title.metric-head{flex-wrap:wrap;}
+  .subnav.inline-nav{margin:0 0 0 8px;gap:6px;flex-wrap:wrap;}
+  /* ===== 创建时间排序（与页面1/6 的 th[data-sort] + .sort-ico 保持统一） ===== */
+  th[data-sort]{cursor:pointer;user-select:none;}
+  th[data-sort]:hover{color:var(--brand);}
+  th[data-sort]:focus-visible{outline:2px solid var(--brand);outline-offset:-2px;}
+  .sort-ico{font-size:10px;margin-left:2px;color:var(--brand);}
+  /* ===== 分页器（沿用页面13 的结构与文案口径） ===== */
+  .pager{display:flex;gap:6px;align-items:center;padding:10px 14px;flex-wrap:wrap;}
+  .pager.card{margin-top:10px;border-radius:6px;}
+  .pager .pg-info{color:var(--ink-3);font-size:12px;margin-right:6px;}
+  .pager .btn-sm{min-height:30px;min-width:30px;padding:4px 11px;}
 </style>
 </head>
 <body>
@@ -240,7 +254,7 @@
       <!-- 主视图（法务 / 管理员） -->
       <div class="main-view">
         <!-- 指标报表 -->
-        <div class="sec-title tight"><span class="line"></span>评测结果指标报表
+        <div class="sec-title tight metric-head"><span class="line"></span>评测结果指标报表
           <span class="help-wrap">
             <span class="help-dot" id="metricHelp" tabindex="0" role="button" aria-label="查看准确率、漏检率、误报率的口径说明" aria-expanded="false" title="指标口径说明">?</span>
             <span class="help-pop" id="metricHelpPop" role="tooltip">
@@ -251,13 +265,14 @@
               <div class="hp-n">三项分母不同，不可直接相加；仅代表本评测集样本表现，不代表线上全量合同比对效果。系统初判来自规则引擎 + 文本差异模型，最终结论以法务复核为准。</div>
             </span>
           </span>
+          <!-- 指标切换 tab：与标题同一行，紧邻标题与口径说明右侧 -->
+          <div class="subnav inline-nav" id="metricNav">
+            <div class="sn active" data-mode="overall">整体</div>
+            <div class="sn" data-mode="byLevel">按风险等级</div>
+            <div class="sn" data-mode="byType">按样本类型</div>
+          </div>
         </div>
         <div class="truth-banner" id="truthBanner" style="display:none;"></div>
-        <div class="subnav" id="metricNav">
-          <div class="sn active" data-mode="overall">整体</div>
-          <div class="sn" data-mode="byLevel">按风险等级</div>
-          <div class="sn" data-mode="byType">按样本类型</div>
-        </div>
         <div class="stats" id="metricCards"></div>
         <div class="card" id="metricTableWrap" style="display:none;">
           <table>
@@ -282,7 +297,7 @@
           </select>
           <div class="spacer"></div>
           <span class="sel-count" id="selCount" style="display:none;">选择<b id="selNum">0</b>条</span>
-          <button class="btn" id="batchBtn" disabled title="勾选任一条后，可一键选中当前筛选结果中的全部样本">批量选择</button>
+          <button class="btn" id="batchBtn" disabled title="勾选任一条后，可一键选中当前筛选结果的全部样本（含其他页）">批量选择</button>
           <button class="btn" id="clearSelBtn" style="display:none;">取消选择</button>
           <button class="btn" id="exportBtn">导出评测集</button>
         </div>
@@ -292,13 +307,17 @@
               <tr>
                 <th class="ck-col"><input type="checkbox" id="checkAll" aria-label="全选当前列表样本"></th>
                 <th>样本编号</th><th>样本类型</th><th>样本来源</th><th>原文条款</th><th>标注标准答案</th>
-                <th>系统初判</th><th>一致</th><th>样本创建时间</th><th>操作</th>
+                <th>系统初判</th><th>一致</th>
+                <th data-sort="created" id="thCreated" tabindex="0" role="button" aria-sort="descending" title="点击切换创建时间排序">样本创建时间<span class="sort-ico" id="createdInd">▼</span></th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody id="tbody"></tbody>
           </table>
           <div class="empty" id="emptyTip" style="display:none;">无匹配样本</div>
         </div>
+        <!-- 列表下方分页器：作用于当前筛选 + 排序后的结果 -->
+        <div class="card pager" id="pager"></div>
       </div>
     </div>
   </div>
@@ -349,11 +368,11 @@ function createdOf(e){ return e.created||'—'; }
 const EVALS = [
   {id:'EV-001', type:'黄金标注', clause:'3.2 付款账期',       golden:{status:'mod',risk:'mid'},  sys:{status:'mod',risk:'mid'},  srcCase:'d1', source:SRC_LIB, created:'2026-09-03 09:20'},
   {id:'EV-002', type:'黄金标注', clause:'4.1 质量标准',       golden:{status:'same',risk:'none'}, sys:{status:'same',risk:'none'}, srcCase:'d2', source:SRC_LIB, created:'2026-09-08 14:05'},
-  {id:'EV-003', type:'黄金标注', clause:'5.3 违约责任',       golden:{status:'del',risk:'high'}, sys:{status:'del',risk:'high'},  srcCase:'d3', source:SRC_LIB, created:'2026-09-15 10:42'},
+  {id:'EV-003', type:'黄金标注', clause:'5.3 违约责任',       golden:{status:'del',risk:'high'}, sys:{status:'del',risk:'high'},  srcCase:'d3', source:SRC_MINE, created:'2026-09-15 10:42'}, // 自动挖掘：违约赔偿上限边界样本
   {id:'EV-004', type:'黄金标注', clause:'6.1 保密义务',       golden:{status:'add',risk:'low'},  sys:{status:'add',risk:'low'},  srcCase:'d4', source:SRC_LIB, created:'2026-09-28 16:18'},
   {id:'EV-005', type:'黄金标注', clause:'7.2 交付地点',       golden:{status:'mod',risk:'mid'},  sys:{status:'mod',risk:'mid'},  srcCase:'d5', source:SRC_LIB, created:'2026-10-09 11:07'},
-  {id:'EV-006', type:'黄金标注', clause:'8.4 知识产权',       golden:{status:'same',risk:'none'}, sys:{status:'mod',risk:'mid'},  srcCase:'d6', source:SRC_LIB, created:'2026-10-17 15:33'}, // 误报
-  {id:'EV-007', type:'黄金标注', clause:'9.1 不可抗力',       golden:{status:'del',risk:'high'}, sys:{status:'same',risk:'none'}, srcCase:'d7', source:SRC_LIB, created:'2026-10-26 09:48'}, // 漏检
+  {id:'EV-006', type:'黄金标注', clause:'8.4 知识产权',       golden:{status:'same',risk:'none'}, sys:{status:'mod',risk:'mid'},  srcCase:'d6', source:SRC_MINE, created:'2026-10-17 15:33'}, // 自动挖掘难例：误报
+  {id:'EV-007', type:'黄金标注', clause:'9.1 不可抗力',       golden:{status:'del',risk:'high'}, sys:{status:'same',risk:'none'}, srcCase:'d7', source:SRC_MINE, created:'2026-10-26 09:48'}, // 自动挖掘难例：漏检
   {id:'EV-008', type:'黄金标注', clause:'10.2 争议管辖',      golden:{status:'add',risk:'low'},  sys:{status:'add',risk:'low'},  srcCase:'d8', source:SRC_LIB, created:'2026-11-04 13:26'}
 ];
 
@@ -364,7 +383,10 @@ let RECS = [
   {id:'RC-103', type:'难例',     clause:'9.1 不可抗力', reason:'难例：合同解除条件偏宽松，需复核', srcCase:'d7'}
 ];
 
-const state = { role:'legal', kw:'', type:'', metricMode:'overall', sel:new Set() };
+/* 样本创建时间默认倒序；分页与勾选状态独立于筛选（勾选跨页保留） */
+const PAGE_SIZE = 5;
+const state = { role:'legal', kw:'', type:'', metricMode:'overall', sel:new Set(),
+  page:1, sortKey:'created', sortDir:'desc' };
 
 function go(url){ window.location.href = url + (url.indexOf('?')>-1?'&':'?') + 'role=' + state.role; }
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2000); }
@@ -483,17 +505,60 @@ function renderRecs(){
 /* 评测样本列表 */
 function filtered(){
   const kw=state.kw.trim().toLowerCase();
-  return EVALS.filter(e=>{
+  const list=EVALS.filter(e=>{
     if(state.type && e.type!==state.type) return false;
     if(kw && !(e.clause.toLowerCase().includes(kw)||e.id.toLowerCase().includes(kw))) return false;
     return true;
   });
+  return sortSamples(list);
 }
+/* 创建时间排序：格式 YYYY-MM-DD HH:mm 可直接按字典序比较；空值恒排末尾，id 作稳定次序 */
+function sortSamples(list){
+  if(state.sortKey!=='created') return list;
+  return list.slice().sort((a,b)=>{
+    const ta=createdOf(a)==='—'?'':createdOf(a), tb=createdOf(b)==='—'?'':createdOf(b);
+    if(!ta && !tb) return a.id.localeCompare(b.id);
+    if(!ta) return 1; if(!tb) return -1;
+    if(ta===tb) return a.id.localeCompare(b.id);
+    const c = ta<tb ? -1 : 1;
+    return state.sortDir==='desc' ? -c : c;
+  });
+}
+function updateSortInd(){
+  const ind=document.getElementById('createdInd'), th=document.getElementById('thCreated');
+  if(ind) ind.textContent = state.sortKey==='created' ? (state.sortDir==='asc'?'▲':'▼') : '';
+  if(th) th.setAttribute('aria-sort', state.sortKey==='created' ? (state.sortDir==='asc'?'ascending':'descending') : 'none');
+}
+function setSort(key){
+  if(key!=='created') return;
+  if(state.sortKey===key) state.sortDir = state.sortDir==='desc' ? 'asc' : 'desc';
+  else { state.sortKey=key; state.sortDir='desc'; }
+  state.page=1;           // 切换排序后回到第一页，避免停留在无意义页码
+  renderTable();
+}
+/* 分页：先筛选 → 再排序 → 最后切片 */
+function pageRows(list){
+  const totalPages=Math.max(1,Math.ceil(list.length/PAGE_SIZE));
+  if(state.page>totalPages) state.page=totalPages;
+  if(state.page<1) state.page=1;
+  const start=(state.page-1)*PAGE_SIZE;
+  return {rows:list.slice(start,start+PAGE_SIZE), totalPages:totalPages};
+}
+function renderPager(totalPages,total){
+  let h='<span class="pg-info">共 '+total+' 条样本 · 每页 '+PAGE_SIZE+' 条 · 第 '+state.page+'/'+totalPages+' 页</span>';
+  h+='<button class="btn btn-sm" '+(state.page<=1?'disabled':'')+' onclick="gotoPage('+(state.page-1)+')">上一页</button>';
+  for(let i=1;i<=totalPages;i++){
+    h+='<button class="btn btn-sm '+(i===state.page?'btn-primary':'')+'" aria-label="第 '+i+' 页"'+(i===state.page?' aria-current="page"':'')+' onclick="gotoPage('+i+')">'+i+'</button>';
+  }
+  h+='<button class="btn btn-sm" '+(state.page>=totalPages?'disabled':'')+' onclick="gotoPage('+(state.page+1)+')">下一页</button>';
+  document.getElementById('pager').innerHTML=h;
+}
+function gotoPage(p){ state.page=p; renderTable(); }
 function ans(g){ return '<span class="tag '+ST_TAG[g.status]+'">'+ST_LABEL[g.status]+'</span> <span class="tag '+RISK_TAG[g.risk]+' t-risk">'+RISK_LABEL[g.risk]+'</span>'; }
 
 /* ============ 批量选择状态 / 导出数据 ============ */
-function updateSelUI(){
-  const n=state.sel.size, list=filtered();
+function updateSelUI(rows){
+  const n=state.sel.size, list=rows || pageRows(filtered()).rows;   // 表头全选按「当前页」计算，勾选总数跨页保留
   const box=document.getElementById('selCount'), num=document.getElementById('selNum');
   if(box) box.style.display=n?'inline':'none';
   if(num) num.textContent=n;
@@ -509,7 +574,7 @@ function updateSelUI(){
     all.disabled=list.length===0;
   }
 }
-function exportRows(){ return state.sel.size ? EVALS.filter(e=>state.sel.has(e.id)) : EVALS; }
+function exportRows(){ return sortSamples(state.sel.size ? EVALS.filter(e=>state.sel.has(e.id)) : EVALS.slice()); } // 导出顺序与当前排序一致
 function csvCell(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; }
 function buildExportCsv(list){
   const head=['样本编号','样本类型','样本来源','原文条款','标注-差异类型','标注-风险等级','系统初判-差异类型','系统初判-风险等级','是否一致','样本创建时间'];
@@ -524,9 +589,11 @@ function buildExportCsv(list){
 }
 function renderTable(){
   const list=filtered();
+  const pg=pageRows(list);
   const tb=document.getElementById('tbody');
+  updateSortInd();                       // 首行调用，保证打开页面即显示 ▼
   document.getElementById('emptyTip').style.display=list.length?'none':'block';
-  tb.innerHTML=list.map(e=>{
+  tb.innerHTML=pg.rows.map(e=>{
     const agree = e.golden.status===e.sys.status && e.golden.risk===e.sys.risk;
     return '<tr>'+
       '<td class="ck-cell"><input type="checkbox" class="row-ck" data-id="'+e.id+'"'+(state.sel.has(e.id)?' checked':'')+' aria-label="选择样本 '+e.id+'"></td>'+
@@ -544,7 +611,8 @@ function renderTable(){
       '</div></td>'+
     '</tr>';
   }).join('');
-  updateSelUI();
+  renderPager(pg.totalPages,list.length);
+  updateSelUI(pg.rows);
 }
 
 function renderAll(){ renderTruthBanner(); renderMetrics(); renderRecs(); renderTable(); }
@@ -568,6 +636,7 @@ function doAddRec(id){
   const r=RECS.splice(idx,1)[0];
   const evId='EV-'+(900+EVALS.length);
   EVALS.push({id:evId, type:r.type, clause:r.clause, golden:{status:'mod',risk:'mid'}, sys:{status:'mod',risk:'mid'}, srcCase:'d1', source:SRC_MINE, created:nowStr()});
+  state.page=1;   // 默认按时间倒序，新样本排在第一页，直接可见
   toast('已加入评测集（演示）：'+r.clause+' → '+evId);
   renderAll();
 }
@@ -627,8 +696,8 @@ function bind(){
     state.metricMode=sn.dataset.mode;
     renderMetrics();
   });
-  document.getElementById('kw').addEventListener('input',e=>{state.kw=e.target.value;renderTable();});
-  document.getElementById('fType').addEventListener('change',e=>{state.type=e.target.value;renderTable();});
+  document.getElementById('kw').addEventListener('input',e=>{state.kw=e.target.value;state.page=1;renderTable();});
+  document.getElementById('fType').addEventListener('change',e=>{state.type=e.target.value;state.page=1;renderTable();});
   document.getElementById('roleSel').addEventListener('change',e=>{state.role=e.target.value;applyPerm();});
   document.getElementById('runBtn').addEventListener('click',()=>{ if(state.role==='procurement'){toast('采购专员无评测权限');return;} runEval(); });
   document.getElementById('exportBtn').addEventListener('click',()=>{ if(state.role==='procurement'){toast('采购专员无导出权限');return;} doExport(); });
@@ -639,16 +708,22 @@ function bind(){
     updateSelUI();
   });
   document.getElementById('checkAll').addEventListener('change',e=>{
-    const list=filtered();
-    if(e.target.checked) list.forEach(x=>state.sel.add(x.id));
-    else list.forEach(x=>state.sel.delete(x.id));
+    const rows=pageRows(filtered()).rows;   // 表头全选：仅当前页
+    if(e.target.checked) rows.forEach(x=>state.sel.add(x.id));
+    else rows.forEach(x=>state.sel.delete(x.id));
     renderTable();
   });
   document.getElementById('batchBtn').addEventListener('click',()=>{
-    const list=filtered();
+    const list=filtered();                 // 批量选择：当前筛选结果的全部页
     list.forEach(x=>state.sel.add(x.id));
     renderTable();
-    toast('已批量选择当前列表 '+list.length+' 条样本（共选中 '+state.sel.size+' 条）');
+    toast('已选中当前筛选结果全部 '+list.length+' 条样本（含其他页，共选中 '+state.sel.size+' 条）');
+  });
+  /* 创建时间排序：点击 / 键盘 Enter、Space */
+  const thc=document.getElementById('thCreated');
+  thc.addEventListener('click',()=>setSort('created'));
+  thc.addEventListener('keydown',e=>{
+    if(e.key==='Enter'||e.key===' '){ e.preventDefault(); setSort('created'); }
   });
   document.getElementById('clearSelBtn').addEventListener('click',()=>{
     state.sel.clear(); renderTable(); toast('已取消选择');
