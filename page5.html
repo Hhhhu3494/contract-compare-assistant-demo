@@ -153,6 +153,35 @@
   .sb-children .sb-sub{padding-left:32px;}
   .sidebar.collapsed .sb-children{display:none!important;}
   .sidebar.collapsed .sb-caret{display:none;}
+
+  /* ===== 盲审只读模式（仅 body.blind-mode 生效；默认零影响） ===== */
+  .blind-banner{display:none;flex:0 0 auto;align-items:center;gap:12px;background:var(--review-bg);border-bottom:1px solid var(--review-bd);color:var(--review-text);padding:9px 16px;font-size:13px;font-weight:600;line-height:1.6;}
+  .blind-banner .bb-ico{font-size:14px;}
+  .blind-banner .bb-text{flex:1;}
+  .blind-banner .bb-btn{border:1px solid var(--review-bd);background:#fff;color:var(--review-text);border-radius:4px;padding:5px 12px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap;}
+  .blind-banner .bb-btn:hover{background:var(--review-bg);}
+  body.blind-mode .blind-banner{display:flex;}
+  /* 原文差异底色 / 删除线中性化；锚点 data-diff-id 与高亮定位不受影响 */
+  body.blind-mode .diff-add,
+  body.blind-mode .diff-del,
+  body.blind-mode .diff-mod{background:transparent;text-decoration:none;color:inherit;}
+  body.blind-mode .diff-block:hover{box-shadow:0 0 0 2px rgba(22,93,255,.28);}
+  /* 当前定位条款：中性蓝色边框 / 光晕，不带任何差异语义颜色 */
+  body.blind-mode .diff-block.diff-active{outline:2px solid var(--brand)!important;outline-offset:1px;box-shadow:0 0 0 3px rgba(22,93,255,.16)!important;}
+  /* 隐藏差异清单图例、复核详情与一切含初判 / 复核结论 / 编辑 / 提交 / 归档的控件 */
+  body.blind-mode .dp-head .legend,
+  body.blind-mode .detail,
+  body.blind-mode .item-top .tag,
+  body.blind-mode #filterBtn,
+  body.blind-mode #filterPop,
+  body.blind-mode #roleSel,
+  body.blind-mode #logBtn,
+  body.blind-mode #archiveBtn,
+  body.blind-mode #submitBtn,
+  body.blind-mode #backBtn,
+  body.blind-mode #archiveBar,
+  body.blind-mode #traceBar,
+  body.blind-mode .modal-mask{display:none!important;}
 </style>
 </head>
 <body>
@@ -201,6 +230,12 @@
   </aside>
 
   <div class="main">
+    <!-- 盲审只读横幅：仅 body.blind-mode（?blind=1）时显示，默认 display:none -->
+    <div class="blind-banner" id="blindBanner">
+      <span class="bb-ico">◈</span>
+      <span class="bb-text">盲审只读 · 仅展示合同原文与差异定位，模型初判与法务复核结论已屏蔽</span>
+      <button type="button" class="bb-btn" id="blindBackBtn" onclick="blindGoBack()">返回复核工单详情</button>
+    </div>
     <!-- 顶部工具栏 -->
     <header class="toolbar">
       <button class="icon-btn" id="sbToggle" title="收起/展开侧边栏">☰</button>
@@ -335,6 +370,9 @@
 <div class="toast" id="toast"></div>
 
 <script>
+/* ====== 盲审只读模式：仅当 ?blind=1 时为真；默认（不带参数）以下新增逻辑全部不生效 ====== */
+const BLIND_MODE = new URLSearchParams(location.search).get('blind')==='1';
+
 /* ============ 数据：差异初判（机器初判，无大模型） ============ */
 const DIFFS = {
   d1:{clause:'第5.2条', loc:'第五章 价款与支付 / 第2款', sysType:'mod', sysRisk:'高',
@@ -533,6 +571,21 @@ function tagType(t){const c={add:'t-add',del:'t-del',mod:'t-mod',same:'t-same'}[
 function tagRisk(r){const c={'高':'r-high','中':'r-mid','低':'r-low','无风险':'r-none'}[r];return '<span class="tag '+c+'">'+r+'</span>';}
 
 function renderList(){
+  /* 盲审只读：清单只保留条款号 / 位置等中性导航信息，不输出任何初判 / 风险 / 复核 / 规则字段与表单 */
+  if(BLIND_MODE){
+    document.getElementById('diffList').innerHTML = Object.keys(DIFFS).map(id=>{
+      const d=DIFFS[id];
+      return ''+
+      '<div class="item" data-list-id="'+id+'">'+
+        '<div class="item-head" data-head="'+id+'">'+
+          '<div class="item-top"><span class="clause-no">'+esc(d.clause)+'</span></div>'+
+          '<div class="item-sum" data-sum="'+id+'">'+esc(d.loc)+'</div>'+
+        '</div>'+
+        '<div class="detail" data-detail="'+id+'"></div>'+
+      '</div>';
+    }).join('');
+    return;
+  }
   const html = Object.keys(DIFFS).map(id=>{
     const d=DIFFS[id];
     // 归档溯源只读快照回填固化值；正常复核流程一律默认空选，须法务手动选择
@@ -700,6 +753,23 @@ const NAV = {
   setting:{}
 };
 function go(url){ window.location.href = url + (url.indexOf('?')>-1?'&':'?') + 'role=' + state.role; }
+
+/* ====== 盲审返回：带回工单与角色上下文，query 一律置于 #hash 之前 ====== */
+function blindGoBack(){
+  if(!BLIND_MODE) return;
+  const ps=new URLSearchParams(location.search);
+  const woId=ps.get('woId');                       // 取不到则省略
+  const role=ps.get('role') || state.role || 'legal';
+  const evalRole=ps.get('evalRole') || 'annotator';  // 缺省按阅卷人返回，避免被误判为法务无权限
+  const reviewer=ps.get('reviewer');
+  const q=new URLSearchParams();
+  q.set('blindBack','1');
+  if(woId) q.set('woId',woId);
+  q.set('evalRole',evalRole);
+  q.set('role',role);
+  if(reviewer) q.set('reviewer',reviewer);
+  window.location.href='page14.html?'+q.toString();
+}
 
 function bind(){
   // 侧边栏收起
@@ -939,6 +1009,7 @@ function toast(msg){
 
 /* ============ 初始化 ============ */
 function init(){
+  if(BLIND_MODE) document.body.classList.add('blind-mode');
   const ps=new URLSearchParams(location.search);
   const ur=ps.get('role');
   if(ur && ['procurement','legal','admin'].includes(ur)){ state.role=ur; document.getElementById('roleSel').value=ur; }

@@ -118,14 +118,18 @@
   .article h4{font-size:13px;color:var(--ink-1);margin:0 0 8px;padding-bottom:6px;border-bottom:1px dashed var(--line);}
   .clause{line-height:1.9;color:var(--ink-1);margin:4px 0;}
   /* 中性定位标记：仅指示「当前标注条款」，不含差异类型 / 风险语义 / 差异底色 */
-  .clause.focus-clause{border-left:3px solid var(--brand);padding-left:9px;margin-left:-12px;background:#F5F9FF;border-radius:0 4px 4px 0;}
+  .clause.focus-clause{border-left:3px solid var(--brand);padding-left:9px;margin-left:-12px;background:#EAF2FF;border-radius:0 4px 4px 0;box-shadow:inset 0 0 0 1px #BEDAFF;}
+  @keyframes focusPulse{0%{background:#D6E6FF;box-shadow:inset 0 0 0 2px var(--brand);}100%{background:#EAF2FF;box-shadow:inset 0 0 0 1px #BEDAFF;}}
+  .clause.focus-clause.flash{animation:focusPulse 1.5s ease-out 1;}
   /* 对齐匹配的标准条款原文（内容补充，沿用 .article 排版，不新增原文版式） */
   .std-match{background:#F5F9FF;border:1px solid #BEDAFF;border-radius:4px;padding:8px 10px;margin:2px 0 8px;font-size:12px;line-height:1.7;color:var(--ink-2);}
   .std-match .sm-t{color:var(--brand);font-weight:600;margin-bottom:2px;}
   .std-match .sm-x{color:var(--ink-1);}
 
   /* ===== 底部真值录入表单 ===== */
-  .truth-panel{flex:0 0 auto;max-height:400px;overflow:auto;background:#fff;border-top:1px solid var(--line);padding:12px 18px 14px;}
+  .truth-panel{flex:0 0 auto;max-height:320px;overflow:auto;background:#fff;border-top:1px solid var(--line);padding:10px 18px 12px;transition:max-height .18s ease;}
+  .truth-panel.collapsed{max-height:44px;overflow:hidden;}
+  .truth-panel.collapsed .tp-body{display:none;}
   .tp-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
   .tp-head .tp-title{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;}
   .tp-head .tp-title .line{width:3px;height:14px;background:var(--brand);border-radius:2px;}
@@ -163,6 +167,16 @@
   .done-banner b{color:var(--brand);}
   .success-line{font-size:13px;color:var(--ink-2);line-height:1.9;}
   .countdown{font-size:12px;color:var(--ink-3);}
+
+  /* ===== v2：紧凑标注表单 / 收起按钮 / 隔离提示 / 结果条 ===== */
+  .tp-inline{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;}
+  .tp-inline .fld{flex:1;min-width:150px;margin:0;}
+  .tp-inline .fld.note-fld{flex:2;min-width:220px;}
+  .tp-inline .fld textarea{min-height:56px;}
+  .tp-head #panelToggle{margin-left:4px;}
+  .locked-box{background:#F7F8FA;border:1px dashed var(--line);border-radius:6px;padding:12px 14px;font-size:12px;color:var(--ink-2);line-height:1.8;}
+  .result-line{margin-top:10px;background:var(--brand-weak);border:1px solid #BEDAFF;border-radius:6px;padding:8px 11px;font-size:12px;color:var(--brand);line-height:1.7;}
+  #ctxBtn{white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -214,11 +228,12 @@
       </div>
       <div class="top-right">
         <span class="lock-note" id="permHint"></span>
-        <label class="lock-note" for="evalRoleSel">评测角色</label>
+        <label class="lock-note" for="evalRoleSel">当前登录人</label>
         <select class="role-sel" id="evalRoleSel">
-          <option value="annotator">评测审核员</option>
+          <option value="A">阅卷人 A</option>
+          <option value="B">阅卷人 B</option>
           <option value="arbitrator">评测仲裁管理员</option>
-          <option value="legal">法务审核员（无权限）</option>
+          <option value="legal">法务业务角色（无权限）</option>
         </select>
       </div>
     </div>
@@ -228,13 +243,13 @@
       <div class="lock-card">
         <div class="lock-ico">🔒</div>
         <h2>法务角色无访问权限</h2>
-        <p>双盲真值复核工单属于<strong>二期模型评测链路</strong>，与法务业务复核工单为两套独立工单体系。<br>法务角色不可查看双盲工单列表，也无法进入真值录入页面。<br>请切换为评测审核员或评测仲裁管理员。</p>
+        <p>本工单属于<strong>二期模型评测链路</strong>，与法务业务复核工单相互隔离。<br>法务业务角色不可查看双盲标注内容，也无法录入标注。<br>请切换为阅卷人 A、阅卷人 B 或评测仲裁管理员。</p>
       </div>
     </div>
 
     <div class="main-view">
       <!-- 1. 顶部常驻提示条 -->
-      <div class="blind-bar" id="blindBar"><span class="bb-ico">◈</span>提示：当前为双盲评测模式，不展示模型预判结果，请独立判断录入真值</div>
+      <div class="blind-bar" id="blindBar"><span class="bb-ico">◈</span>提示：当前为双盲评测模式，全程屏蔽模型判定结论；A / B 阅卷人互相不可见，请仅依据原文独立判断录入标注</div>
 
       <div class="workarea">
         <!-- 对齐信息条：仅样本 / 标准条款 / 合同标识，无任何初判信息 -->
@@ -251,7 +266,8 @@
             <span>同步滚动</span>
             <div class="switch on" id="syncSwitch" title="同步滚动开关"></div>
           </div>
-          <span class="vb-label" style="margin-left:auto;">仅展示合同原文与对齐匹配的标准条款原文</span>
+          <span class="vb-label" style="margin-left:auto;">仅原文 · 单条差异自动定位</span>
+          <button class="btn btn-sm" id="ctxBtn" title="打开复核对比页（三栏 + 差异导航清单）查看整份合同上下文，盲审只读模式屏蔽全部模型初判与法务复核结论">查看完整合同上下文</button>
         </div>
         <div class="panes" id="panes">
           <div class="pane-col left-col">
@@ -281,8 +297,8 @@
 
 <script>
 /* ==========================================================================
-   复核工单详情（页面14）
-   - 独立工单体系：与【页面5】法务业务复核工单完全隔离，独立 key / 独立状态机
+   复核工单详情（页面14 · v2 统一双盲工单）
+   - 与【页面11】共用统一双盲工单契约（_blind_core_src.js 内联），标注数据实时互通
    - 入口仅来自【页面10】评测集样本表格 /【页面11】双盲审核工单列表
    - 存储策略：内存权威 + localStorage 尽力持久化 + URL 参数兜底
      （预览容器可能拒绝 localStorage，存储不可用时本页与链路仍完整可用）
@@ -305,18 +321,203 @@ const NAV = {
   setting:{}
 };
 
+/* ==========================================================================
+   统一双盲工单契约 v2（【页面11】/【页面14】共用，文本必须逐字一致）
+   - 所有工单统一为双盲工单：A / B 两方独立标注，互相不可见对方标注内容
+   - 双方均保存后自动比对：一致 →【已完成】+ 生成标准真值回写评测集；
+     不一致 →【待仲裁】，由评测仲裁管理员录入最终仲裁真值
+   - 全程屏蔽模型判定结论：modelSnapshot 仅作后台配对数据，绝不进入任何 DOM
+   - 不再存在单人标注工单 / 单人真值
+   ========================================================================== */
+const WO_KEY='CLM_TRUTH_WO_V1';
+const RESULT_KEY='CLM_TRUTH_RESULT_V1';
+const IDENTITY_KEY='CLM_BLIND_IDENTITY_V1';
+const BLIND_RESULT_KEY='CLM_BLIND_RESULT_V1';
+
 const ST_LABEL={add:'新增',del:'删除',mod:'修改',same:'一致'};
 const RISK_VALUES=['高','中','低','无风险'];
 const RISK_TO_CODE={'高':'high','中':'mid','低':'low','无风险':'none'};
-const WO_STATUS={pending:'待复核',arb:'待仲裁',done:'复核完成'};
-const WO_STATUS_TAG={pending:'t-pending',arb:'t-arb',done:'t-done'};
-const EVAL_ROLE_LABEL={
-  annotator:'评测审核员（独立标注 · 全程不可见模型初判）',
-  arbitrator:'评测仲裁管理员（可查看多方标注 · 提交后解锁模型预判）',
-  legal:'法务审核员（业务链路 · 无访问权限）'
+const CODE_TO_RISK={high:'高',mid:'中',low:'低',none:'无风险'};
+const RISK_TAG={'高':'t-high','中':'t-mid','低':'t-low','无风险':'t-none'};
+const WO_STATUS={blind:'待双盲',arb:'待仲裁',done:'已完成'};
+const WO_STATUS_TAG={blind:'t-pending',arb:'t-arb',done:'t-done'};
+const IDENTITY_LABEL={A:'阅卷人 A',B:'阅卷人 B',arbitrator:'评测仲裁管理员',legal:'法务业务角色（无权限）'};
+
+/* 模型初判快照：仅用于真值回写时与人工标注配对，任何标注阶段都不渲染 */
+const MODEL_SNAPSHOTS = {
+  d1:{type:'mod',risk:'高',ruleNo:'R-Pay-07',basis:'规则 R-Pay-07：付款账期偏离基准模板（>30日）触发高风险命中。'},
+  d2:{type:'mod',risk:'中',ruleNo:'R-Q-03',basis:'规则 R-Q-03：质量标准由国标变更为国际标准，需确认等效性。'},
+  d3:{type:'mod',risk:'高',ruleNo:'R-Pen-02',basis:'规则 R-Pen-02：违约金上限>10% 触发高风险，需评估赔付敞口。'},
+  d4:{type:'del',risk:'中',ruleNo:'R-Sec-01',basis:'规则 R-Sec-01：基准合同含保密义务，待审合同缺失该条款。'},
+  d5:{type:'add',risk:'中',ruleNo:'R-IP-01',basis:'规则 R-IP-01：待审合同新增改进技术权属条款，基准合同未约定。'},
+  d6:{type:'mod',risk:'低',ruleNo:'R-Del-01',basis:'规则 R-Del-01：交付地点由甲方仓库变更为乙方工厂。'},
+  d7:{type:'mod',risk:'中',ruleNo:'R-Acc-01/02',basis:'验收期规则部分命中且结论冲突，系统无法稳定定级。'},
+  d8:{type:'mod',risk:'高',ruleNo:'R-Disp-01',basis:'规则 R-Disp-01：争议解决由仲裁变更为诉讼，改变救济路径。'},
+  d9:{type:'mod',risk:'中',ruleNo:'R-FM-01',basis:'不可抗力定义文本语义模糊，规则命中冲突。'}
 };
 
-/* ===== 标准条款字典（来自【页面6】标准条款库，仅条款原文，不含风险 / 规则 / 判定依据） ===== */
+/* 统一工单 seed：全部为双盲工单，A / B 各一份独立标注 */
+const WO_SEED=[
+  {id:'QC-201',sampleId:'EV-003',riskSampleId:'RS-011',stdClause:'CL-003',clause:'5.3 违约责任',diff:'d3',contract:'HT-SUP-2026-001',status:'blind',annotations:{A:null,B:null},truth:null,createdAt:'2026-11-05 09:00'},
+  {id:'QC-202',sampleId:'EV-005',riskSampleId:'RS-012',stdClause:'CL-008',clause:'7.2 交付地点',diff:'d6',contract:'HT-SUP-2026-001',status:'blind',annotations:{A:{type:'mod',risk:'中',note:'运费承担主体表述模糊',time:'2026-11-06 10:02',saved:true},B:null},truth:null,createdAt:'2026-11-05 09:10'},
+  {id:'QC-203',sampleId:'EV-007',riskSampleId:'RS-013',stdClause:'CL-005',clause:'9.1 不可抗力',diff:'d9',contract:'HT-SUP-2026-003',status:'arb',annotations:{A:{type:'mod',risk:'高',note:'解除条件偏宽松，应升级',time:'2026-11-06 11:05',saved:true},B:{type:'same',risk:'无风险',note:'认为与标准一致',time:'2026-11-06 11:32',saved:true}},truth:null,createdAt:'2026-11-05 09:20'},
+  {id:'QC-204',sampleId:'EV-001',riskSampleId:'RS-001',stdClause:'CL-001',clause:'3.2 付款账期',diff:'d1',contract:'HT-SUP-2026-002',status:'done',annotations:{A:{type:'mod',risk:'高',note:'账期由 30 日延长至 60 日',time:'2026-11-06 09:40',saved:true},B:{type:'mod',risk:'高',note:'付款节点实质变更',time:'2026-11-06 10:11',saved:true}},truth:{type:'mod',risk:'高',note:'',source:'双人一致',by:'A / B 双人盲审',time:'2026-11-06 10:11'},createdAt:'2026-11-05 09:30'},
+  {id:'QC-205',sampleId:'EV-004',riskSampleId:'RS-006',stdClause:'CL-009',clause:'6.1 保密义务',diff:'d4',contract:'HT-SUP-2026-001',status:'done',annotations:{A:{type:'del',risk:'中',note:'待审合同缺失保密条款',time:'2026-11-06 13:02',saved:true},B:{type:'del',risk:'中',note:'按删除处理',time:'2026-11-06 13:40',saved:true}},truth:{type:'del',risk:'中',note:'',source:'双人一致',by:'A / B 双人盲审',time:'2026-11-06 13:40'},createdAt:'2026-11-05 09:40'},
+  {id:'TW-2026-001',sampleId:'EV-001',riskSampleId:'RS-001',stdClause:'CL-001',clause:'3.2 付款账期',diff:'d1',contract:'HT-SUP-2026-001',status:'blind',annotations:{A:null,B:null},truth:null,createdAt:'2026-11-05 09:12'},
+  {id:'TW-2026-002',sampleId:'EV-004',riskSampleId:'RS-006',stdClause:'CL-009',clause:'6.1 保密义务',diff:'d4',contract:'HT-SUP-2026-002',status:'blind',annotations:{A:{type:'del',risk:'中',note:'待审合同未列明保密条款，按删除处理',time:'2026-11-06 10:20',saved:true},B:null},truth:null,createdAt:'2026-11-05 09:30'},
+  {id:'TW-2026-003',sampleId:'EV-005',riskSampleId:'RS-008',stdClause:'CL-004',clause:'7.2 交付地点',diff:'d6',contract:'HT-SUP-2026-001',status:'arb',annotations:{A:{type:'mod',risk:'高',note:'交付地变更影响物流成本与责任边界',time:'2026-11-06 11:05',saved:true},B:{type:'same',risk:'无风险',note:'与标准模板一致，无实质差异',time:'2026-11-06 11:32',saved:true}},truth:null,createdAt:'2026-11-05 10:05'},
+  {id:'TW-2026-004',sampleId:'EV-008',riskSampleId:'RS-004',stdClause:'CL-010',clause:'10.2 争议管辖',diff:'d8',contract:'HT-SUP-2026-001',status:'done',annotations:{A:{type:'mod',risk:'高',note:'救济路径由仲裁改为诉讼',time:'2026-11-06 14:02',saved:true},B:{type:'mod',risk:'高',note:'争议解决方式实质变更',time:'2026-11-06 14:26',saved:true}},truth:{type:'mod',risk:'高',note:'',source:'双人一致',by:'A / B 双人盲审',time:'2026-11-06 14:26'},createdAt:'2026-11-05 10:40'}
+];
+WO_SEED.forEach(w=>{ w.modelSnapshot=MODEL_SNAPSHOTS[w.diff]||MODEL_SNAPSHOTS.d1; });
+
+/* ===== 存储层：内存权威 + localStorage 尽力持久化 + 旧格式兼容 ===== */
+let _woCache=null,_resultCache=null;
+function safeRead(k){ try{ const r=localStorage.getItem(k); return r?JSON.parse(r):null; }catch(e){ return null; } }
+function safeWrite(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+function riskNorm(r){ return CODE_TO_RISK[r]||r||''; }
+function normalizeWO(w){
+  const out=Object.assign({},w);
+  if(out.status==='pending'||out.status==='复核完成') out.status='blind';
+  if(!['blind','arb','done'].includes(out.status)) out.status='blind';
+  if(!out.annotations||Array.isArray(out.annotations)){
+    const a={A:null,B:null};
+    (Array.isArray(out.annotations)?out.annotations:[]).forEach(x=>{
+      const k=/B/.test(String(x.reviewer||''))?'B':'A';
+      a[k]={type:x.type||'',risk:riskNorm(x.risk),note:x.note||'',time:x.time||'',saved:true};
+    });
+    ['A','B'].forEach(k=>{
+      const old=out[k];
+      if(old&&!a[k]) a[k]={type:old.type||'',risk:riskNorm(old.risk),note:old.note||'',time:old.time||'',saved:!!old.done};
+    });
+    out.annotations=a;
+  }
+  ['A','B'].forEach(k=>{ const a=out.annotations[k]; if(a&&a.risk) a.risk=riskNorm(a.risk); });
+  if(out.truth){
+    out.truth.risk=riskNorm(out.truth.risk);
+    if(out.truth.source==='单人真值') out.truth.source='双人一致';
+  }
+  if(!out.modelSnapshot) out.modelSnapshot=MODEL_SNAPSHOTS[out.diff]||MODEL_SNAPSHOTS.d1;
+  if(!out.contract) out.contract=out.src||'HT-SUP-2026-001';
+  return out;
+}
+function allWOs(){
+  if(!_woCache){
+    const base=WO_SEED.map(w=>JSON.parse(JSON.stringify(w)));
+    const saved=safeRead(WO_KEY);
+    if(Array.isArray(saved)) saved.forEach(s=>{
+      const n=normalizeWO(s); const i=base.findIndex(w=>w.id===n.id);
+      if(i>=0) base[i]=Object.assign(base[i],n); else base.push(n);
+    });
+    _woCache=base;
+  }
+  return _woCache;
+}
+function allResults(){ if(!_resultCache){ const a=safeRead(RESULT_KEY); _resultCache=Array.isArray(a)?a:[]; } return _resultCache; }
+function persist(){ safeWrite(WO_KEY,allWOs()); }   // 不覆盖已有真值回写结果
+function findWO(id){ return allWOs().find(w=>w.id===id)||null; }
+function nowStr(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ===== 当前登录人：阅卷人 A / B / 仲裁管理员 / 法务（无权限） =====
+   URL 参数只在首次解析时生效并缓存，之后以用户在顶栏切换的身份为准，
+   避免 URL 里的 reviewer 参数把用户切换回原身份。 */
+let _identity=null;
+function currentIdentity(){
+  if(_identity) return _identity;
+  const p=new URLSearchParams(location.search);
+  const ev=p.get('evalRole');
+  let v=null;
+  if(ev==='arbitrator') v='arbitrator';
+  else if(ev==='legal') v='legal';
+  else {
+    const r=p.get('reviewer');
+    if(r==='A'||r==='B') v=r;
+    else if(ev==='annotator'){
+      const st=safeRead(IDENTITY_KEY); v=(st==='A'||st==='B')?st:'A';
+    } else {
+      const st=safeRead(IDENTITY_KEY);
+      v=['A','B','arbitrator','legal'].includes(st)?st:'A';
+    }
+  }
+  _identity=v; safeWrite(IDENTITY_KEY,v);
+  return v;
+}
+function setIdentity(v){ if(['A','B','arbitrator','legal'].includes(v)){ _identity=v; safeWrite(IDENTITY_KEY,v); } }
+function isArbitrator(){ return currentIdentity()==='arbitrator'; }
+function isLegal(){ return currentIdentity()==='legal'; }
+function currentReviewer(){ const i=currentIdentity(); return (i==='A'||i==='B')?i:'A'; }
+function identityLabel(){ return IDENTITY_LABEL[currentIdentity()]||'阅卷人 A'; }
+function myAnnotation(w){ return (w.annotations||{})[currentReviewer()]||null; }
+function bothSaved(w){ const a=w.annotations||{}; return !!(a.A&&a.A.saved&&a.B&&a.B.saved); }
+
+/* ===== 真值回写：仅写评测集链路，不反向修改风险条款库业务样本 ===== */
+function writeTruthResult(w){
+  const ms=w.modelSnapshot||{},t=w.truth||{};
+  const rec={woId:w.id,sampleId:w.sampleId,riskSampleId:w.riskSampleId,stdClause:w.stdClause,
+    clause:w.clause,diff:w.diff,
+    truth:{type:t.type,risk:t.risk,riskCode:RISK_TO_CODE[t.risk]||'none',note:t.note||''},
+    modelSnapshot:{type:ms.type||'mod',risk:ms.risk||'中',riskCode:RISK_TO_CODE[ms.risk]||'mid',ruleNo:ms.ruleNo||'',basis:ms.basis||''},
+    pairedAt:nowStr(),source:t.source||'双人一致',final:true,scope:'eval-only'};
+  const list=allResults(); const i=list.findIndex(x=>x.woId===w.id);
+  if(i<0) list.push(rec); else list[i]=rec;
+  _resultCache=list; safeWrite(RESULT_KEY,list);
+  /* 兼容【页面10】从【页面12】纳入的 EV-TR 样本统计（同一结论写一份轻量记录） */
+  try{
+    const bl=JSON.parse(localStorage.getItem(BLIND_RESULT_KEY)||'[]');
+    const r2={sampleId:w.sampleId,woId:w.id,type:t.type,risk:RISK_TO_CODE[t.risk]||'none',time:nowStr(),source:t.source||'双人一致'};
+    const j=bl.findIndex(x=>x.sampleId===w.sampleId&&x.woId===w.id);
+    if(j<0) bl.push(r2); else bl[j]=r2;
+    localStorage.setItem(BLIND_RESULT_KEY,JSON.stringify(bl));
+  }catch(e){}
+}
+
+/* ===== 流转：双方均保存后自动比对 ===== */
+function settleWorkOrder(w){
+  const a=w.annotations||{A:null,B:null};
+  if(w.status==='done') return 'done';
+  if(!(a.A&&a.A.saved&&a.B&&a.B.saved)) return 'pending';
+  if(a.A.type===a.B.type&&a.A.risk===a.B.risk){
+    w.status='done';
+    w.truth={type:a.A.type,risk:a.A.risk,note:'',source:'双人一致',by:'A / B 双人盲审',time:nowStr()};
+    writeTruthResult(w);
+    return 'agree';
+  }
+  w.status='arb'; w.truth=null;
+  return 'conflict';
+}
+function saveAnnotation(w,type,risk,note){
+  if(w.status==='done') return {ok:false,msg:'该工单已完成，不可重复标注'};
+  if(w.status==='arb') return {ok:false,msg:'双方结论不一致，工单已转【待仲裁】，请由仲裁管理员裁定'};
+  if(isLegal()) return {ok:false,msg:'法务业务角色无评测链路权限'};
+  if(isArbitrator()) return {ok:false,msg:'仲裁管理员不参与盲审标注，请直接录入最终仲裁真值'};
+  w.annotations=w.annotations||{A:null,B:null};
+  w.annotations[currentReviewer()]={type:type,risk:risk,note:note||'',time:nowStr(),saved:true};
+  const outcome=settleWorkOrder(w);
+  persist();
+  return {ok:true,outcome:outcome};
+}
+function finalArbitration(w,type,risk,note){
+  if(!isArbitrator()) return {ok:false,msg:'仅评测仲裁管理员可录入最终仲裁真值'};
+  w.status='done';
+  w.truth={type:type,risk:risk,note:note||'',source:'负责人仲裁',by:'评测仲裁管理员',time:nowStr()};
+  writeTruthResult(w); persist();
+  return {ok:true,outcome:'done'};
+}
+
+/* ===== 共用小工具 ===== */
+function statusTag(s){ return '<span class="tag '+WO_STATUS_TAG[s]+'">'+WO_STATUS[s]+'</span>'; }
+function optType(v,ph){ return '<option value=""'+(v?'':' selected')+' disabled>'+(ph||'请选择差异类型')+'</option>'+
+  Object.keys(ST_LABEL).map(k=>'<option value="'+k+'"'+(v===k?' selected':'')+'>'+ST_LABEL[k]+'</option>').join(''); }
+function optRisk(v,ph){ return '<option value=""'+(v?'':' selected')+' disabled>'+(ph||'请选择风险等级')+'</option>'+
+  RISK_VALUES.map(k=>'<option value="'+k+'"'+(v===k?' selected':'')+'>'+k+'</option>').join(''); }
+function myStatusText(w){
+  if(w.status==='done') return '双方标注完成 · 标准真值已回写评测集';
+  if(w.status==='arb') return '双方结论不一致 · 待仲裁管理员裁定';
+  const me=myAnnotation(w);
+  return me&&me.saved ? '你已保存标注 · 双方完成后自动比对' : '你尚未保存标注 · 请独立完成盲审';
+}
+
+
 const STD_CLAUSES = {
   'CL-001':{title:'付款账期与结算条款', text:'账期≤60日，逾期违约金按日万分之五。'},
   'CL-002':{title:'质量标准与验收条款', text:'到货 7 日内完成验收，质保期≥12 月。'},
@@ -329,45 +530,6 @@ const STD_CLAUSES = {
   'CL-010':{title:'不可抗力与合同解除', text:'旧版解除条件偏宽松，需按现行模板复核。'}
 };
 
-/* ===== 工单创建时冻结的「模型初判快照」=====
-   后台配对使用，页面在任何标注阶段都不渲染；仅评测仲裁管理员提交真值后才可解锁查看。 */
-const MODEL_SNAPSHOTS = {
-  d1:{type:'mod',risk:'高',   ruleNo:'R-Pay-07',  basis:'规则 R-Pay-07：付款账期偏离基准模板（>30日）触发高风险命中。'},
-  d2:{type:'mod',risk:'中',   ruleNo:'R-Q-03',    basis:'规则 R-Q-03：质量标准由国标变更为国际标准，需确认等效性。'},
-  d3:{type:'mod',risk:'高',   ruleNo:'R-Pen-02',  basis:'规则 R-Pen-02：违约金上限>10% 触发高风险，需评估赔付敞口。'},
-  d4:{type:'del',risk:'中',   ruleNo:'R-Sec-01',  basis:'规则 R-Sec-01：基准合同含保密义务，待审合同缺失该条款。'},
-  d5:{type:'add',risk:'中',   ruleNo:'R-IP-01',   basis:'规则 R-IP-01：待审合同新增改进技术权属条款，基准合同未约定。'},
-  d6:{type:'mod',risk:'低',   ruleNo:'R-Del-01',  basis:'规则 R-Del-01：交付地点由甲方仓库变更为乙方工厂。'},
-  d7:{type:'mod',risk:'中',   ruleNo:'R-Acc-01/02',basis:'验收期规则部分命中且结论冲突，系统无法稳定定级。'},
-  d8:{type:'mod',risk:'高',   ruleNo:'R-Disp-01', basis:'规则 R-Disp-01：争议解决由仲裁变更为诉讼，改变救济路径。'},
-  d9:{type:'mod',risk:'中',   ruleNo:'R-FM-01',   basis:'不可抗力定义文本语义模糊，规则命中冲突。'}
-};
-
-/* ===== 独立真值复核工单（seed）===== */
-const WO_KEY='CLM_TRUTH_WO_V1';
-const RESULT_KEY='CLM_TRUTH_RESULT_V1';
-const WO_SEED=[
-  {id:'TW-2026-001', sampleId:'EV-001', riskSampleId:'RS-001', stdClause:'CL-001',
-   clause:'3.2 付款账期', diff:'d1', contract:'HT-SUP-2026-001', status:'pending',
-   annotations:[], draft:null, truth:null, createdAt:'2026-11-05 09:12'},
-  {id:'TW-2026-002', sampleId:'EV-004', riskSampleId:'RS-006', stdClause:'CL-009',
-   clause:'6.1 保密义务', diff:'d4', contract:'HT-SUP-2026-002', status:'pending',
-   annotations:[{reviewer:'评测审核员 A',type:'del',risk:'中',note:'待审合同未列明保密条款，按删除处理',time:'2026-11-06 10:20'}],
-   draft:null, truth:null, createdAt:'2026-11-05 09:30'},
-  {id:'TW-2026-003', sampleId:'EV-005', riskSampleId:'RS-008', stdClause:'CL-004',
-   clause:'7.2 交付地点', diff:'d6', contract:'HT-SUP-2026-001', status:'arb',
-   annotations:[{reviewer:'评测审核员 A',type:'mod',risk:'高',note:'交付地变更影响物流成本与责任边界',time:'2026-11-06 11:05'},
-                {reviewer:'评测审核员 B',type:'same',risk:'无风险',note:'与标准模板一致，无实质差异',time:'2026-11-06 11:32'}],
-   draft:null, truth:null, createdAt:'2026-11-05 10:05'},
-  {id:'TW-2026-004', sampleId:'EV-008', riskSampleId:'RS-004', stdClause:'CL-010',
-   clause:'10.2 争议管辖', diff:'d8', contract:'HT-SUP-2026-001', status:'done',
-   annotations:[{reviewer:'评测审核员 A',type:'mod',risk:'高',note:'救济路径由仲裁改为诉讼',time:'2026-11-06 14:02'}],
-   truth:{type:'mod',risk:'高',note:'争议解决由仲裁改为诉讼',source:'单人真值'},
-   draft:null, createdAt:'2026-11-05 10:40'}
-];
-WO_SEED.forEach(w=>{ w.modelSnapshot=MODEL_SNAPSHOTS[w.diff]||MODEL_SNAPSHOTS.d1; });
-
-/* ===== 合同原文数据：与【页面5】ARTICLES 一致，仅把差异 ID 改名为对齐引用 ref ===== */
 const ARTICLES = [
   {title:'第一条 标的与供货范围', rows:[
     {l:'1.1 乙方向甲方供应工业机器人本体及配套控制系统，型号见附件一《供货清单》。', r:'1.1 乙方向甲方供应工业机器人本体及配套控制系统，型号见附件一《供货清单》。'},
@@ -402,81 +564,40 @@ const ARTICLES = [
   ]}
 ];
 
-/* ===== 存储层：内存权威，localStorage 尽力持久化 ===== */
-let _woCache=null, _resultCache=null;
-function safeRead(key){ try{ const raw=localStorage.getItem(key); return raw?JSON.parse(raw):null; }catch(e){ return null; } }
-function safeWrite(key,val){ try{ localStorage.setItem(key,JSON.stringify(val)); }catch(e){} }
-function allWOs(){
-  if(!_woCache){
-    const saved=safeRead(WO_KEY);
-    const base=WO_SEED.map(w=>JSON.parse(JSON.stringify(w)));
-    if(Array.isArray(saved)) saved.forEach(s=>{
-      const i=base.findIndex(w=>w.id===s.id);
-      if(i>=0) base[i]=Object.assign(base[i],s); else base.push(s);
-    });
-    _woCache=base;
-  }
-  return _woCache;
-}
-function allResults(){
-  if(!_resultCache){ const a=safeRead(RESULT_KEY); _resultCache=Array.isArray(a)?a:[]; }
-  return _resultCache;
-}
-function persist(){ safeWrite(WO_KEY,allWOs()); safeWrite(RESULT_KEY,allResults()); }
 
-/* ===== 状态 ===== */
-const state = {
-  role:'legal', evalRole:'annotator', from:'qc', woId:'', reviewer:'A',
-  view:'dual', sync:true, submitted:false, redirectUrl:'',
-  form:{type:'',risk:'',note:''}, reqError:{}, reqMsg:'', modelOpen:false
-};
-function nowStr(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); }
-function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const state={role:'legal',from:'qc',woId:'',view:'dual',sync:true,panelCollapsed:false,
+  form:{type:'',risk:'',note:''},msg:'',submitted:false};
+
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2000); }
-function go(url){ return url + (url.indexOf('?')>-1?'&':'?') + 'role=' + encodeURIComponent(state.role); }
-function currentWO(){ return allWOs().find(w=>w.id===state.woId) || allWOs()[0]; }
-function reviewerName(){ return state.evalRole==='arbitrator' ? '评测仲裁管理员' : ('评测审核员 '+state.reviewer); }
-function isArbWO(w){ return w.status==='arb'; }
-function canSubmit(w){
-  if(state.evalRole==='legal') return false;
-  if(w.status==='done') return false;
-  if(isArbWO(w) && state.evalRole!=='arbitrator') return false;   // 待仲裁仅评测负责人可裁定
-  return true;
-}
+function go(url){ return url+(url.indexOf('?')>-1?'&':'?')+'role='+encodeURIComponent(state.role); }
+function currentWO(){ return findWO(state.woId)||allWOs()[0]; }
 
-/* ===== 从入口参数解析 / 创建工单 ===== */
+/* ===== 从入口参数解析 / 新建统一双盲工单 ===== */
 function ensureWorkOrder(p){
-  const wos=allWOs();
-  let w = p.get('woId') ? wos.find(x=>x.id===p.get('woId')) : null;
+  let w=p.get('woId')?findWO(p.get('woId')):null;
+  if(!w&&p.get('sampleId')) w=allWOs().find(x=>x.sampleId===p.get('sampleId'));
   if(w) return w;
-  const sampleId=p.get('sampleId')||'';
-  w = sampleId ? wos.find(x=>x.sampleId===sampleId) : null;
-  if(w) return w;
-  // 入口1 新样本：按创建时冻结的模型初判快照建立独立工单（快照不参与页面渲染）
   const diff=p.get('diff')||'d1';
-  const id='TW-2026-'+String(900+wos.length).slice(-3);
-  w={id, sampleId:sampleId||('EV-'+id.slice(-3)), riskSampleId:p.get('rs')||'RS-001',
-     stdClause:p.get('std')||'CL-001', clause:p.get('clause')||'3.2 付款账期', diff,
-     contract:p.get('contract')||'HT-SUP-2026-001', status:'pending',
-     annotations:[], draft:null, truth:null, createdAt:nowStr(),
-     modelSnapshot:MODEL_SNAPSHOTS[diff]||MODEL_SNAPSHOTS.d1};
-  wos.push(w); persist();
+  const id='TW-2026-'+String(900+allWOs().length).slice(-3);
+  w={id:id,sampleId:p.get('sampleId')||('EV-'+id.slice(-3)),riskSampleId:p.get('rs')||'RS-001',
+     stdClause:p.get('std')||'CL-001',clause:p.get('clause')||'3.2 付款账期',diff:diff,
+     contract:p.get('contract')||'HT-SUP-2026-001',status:'blind',annotations:{A:null,B:null},
+     truth:null,createdAt:nowStr(),modelSnapshot:MODEL_SNAPSHOTS[diff]||MODEL_SNAPSHOTS.d1};
+  allWOs().push(w); persist();
   return w;
 }
 
-/* ===== 渲染：对齐信息条 ===== */
+/* ===== 对齐信息条：仅工单元信息，无任何判定内容 ===== */
 function renderAlignBar(w){
-  const std=STD_CLAUSES[w.stdClause]||{title:'标准条款',text:'按基准模板执行。'};
   document.getElementById('alignBar').innerHTML=
-    '<span>真值工单 <b class="ab-code">'+esc(w.id)+'</b></span><span class="ab-sep">|</span>'+
-    '<span>评测样本 <b class="ab-code">'+esc(w.sampleId)+'</b></span><span class="ab-sep">|</span>'+
-    '<span>风险样本 <b class="ab-code">'+esc(w.riskSampleId)+'</b>（已启用入库样本）</span><span class="ab-sep">|</span>'+
-    '<span>对齐匹配标准条款 <b>'+esc(w.stdClause)+' '+esc(std.title)+'</b></span><span class="ab-sep">|</span>'+
-    '<span>来源合同 <span class="ab-code">'+esc(w.contract)+'</span></span>';
-  document.getElementById('rightCode').textContent='合同编号：'+w.contract;
+    '<span>双盲工单 <b class="ab-code">'+esc(w.id)+'</b></span><span class="ab-sep">|</span>'+
+    '<span>评测样本 <b class="ab-code">'+esc(w.sampleId||'—')+'</b></span><span class="ab-sep">|</span>'+
+    '<span>差异条款 <b>'+esc(w.clause)+'</b>（'+esc(w.diff)+'）</span><span class="ab-sep">|</span>'+
+    '<span>状态 '+statusTag(w.status)+'</span><span class="ab-sep">|</span>'+
+    '<span>当前登录人 <b>'+esc(identityLabel())+'</b></span>';
 }
 
-/* ===== 渲染：复用页面5 双栏原文排版（仅纯文本 + 中性定位 + 标准条款对齐块） ===== */
+/* ===== 两栏原文：仅自动定位并高亮本工单这一条差异 ===== */
 function stdMatchHtml(w){
   const std=STD_CLAUSES[w.stdClause]||{title:'标准条款',text:'按基准模板执行。'};
   return '<div class="std-match"><div class="sm-t">↳ 对齐匹配标准条款 · '+esc(w.stdClause)+' '+esc(std.title)+'</div>'+
@@ -487,7 +608,7 @@ function renderPane(side,w){
     const isTarget=a.rows.some(r=>r.ref===w.diff);
     const lines=a.rows.map(r=>{
       const txt=side==='l'?r.l:r.r;
-      const focus=r.ref===w.diff?' class="clause focus-clause" data-focus-clause="1"':' class="clause"';
+      const focus=r.ref===w.diff?' class="clause focus-clause" data-focus-clause="1" data-diff-ref="'+esc(w.diff)+'"':' class="clause"';
       return '<div'+focus+'>'+esc(txt)+'</div>';
     }).join('');
     const std=(side==='l'&&isTarget)?stdMatchHtml(w):'';
@@ -495,286 +616,171 @@ function renderPane(side,w){
   }).join('');
 }
 function renderPanes(w){
-  document.getElementById('leftPane').innerHTML=renderPane('l',w);
-  document.getElementById('rightPane').innerHTML=renderPane('r',w);
-  // 定位到当前标注条款（中性滚动，不产生任何差异高亮）
-  requestAnimationFrame(()=>{
-    // 两栏使用同一个目标值定位到「目标章节容器」，保证章节标题与对齐标准条款块完整可见且上下对齐
-    const lp=document.getElementById('leftPane'), rp=document.getElementById('rightPane');
-    const t=lp.querySelector('[data-focus-clause]');
-    if(!t) return;
+  const lp=document.getElementById('leftPane'),rp=document.getElementById('rightPane');
+  lp.innerHTML=renderPane('l',w); rp.innerHTML=renderPane('r',w);
+  /* 同步定位：DOM 写入后立即读取 offsetTop 触发布局，左右栏滚到同一章节，
+     不依赖 rAF（预览容器 / 无头环境可能不推进帧）。 */
+  const t=lp.querySelector('[data-focus-clause]');
+  if(t){
     const target=Math.max(0,(t.closest('.article')||t).offsetTop-8);
     lp.scrollTop=target; rp.scrollTop=target;
+  }
+  requestAnimationFrame(()=>{
+    if(!t) return;
+    [lp,rp].forEach(pane=>{
+      const el=pane.querySelector('[data-focus-clause]');
+      if(el){ el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'),1600); }
+    });
+    toast('已自动定位并高亮本工单差异条款：'+w.clause);
   });
 }
 function bindSyncScroll(){
-  const lp=document.getElementById('leftPane'), rp=document.getElementById('rightPane');
+  const lp=document.getElementById('leftPane'),rp=document.getElementById('rightPane');
   let lock=false;
   function pair(from,to){
     from.addEventListener('scroll',()=>{
       if(!state.sync||lock) return;
-      lock=true;
-      // 按像素同步：两栏逐行对照，避免因两栏总高不同（左栏多标准条款块）产生章节错位
-      to.scrollTop=from.scrollTop;
-      requestAnimationFrame(()=>{lock=false;});
+      lock=true; to.scrollTop=from.scrollTop; requestAnimationFrame(()=>{lock=false;});
     });
   }
   pair(lp,rp); pair(rp,lp);
 }
 
-/* ===== 渲染：底部真值录入表单 ===== */
-function optType(v){ return '<option value=""'+(v?'':' selected')+' disabled>请选择真实差异类型</option>'+
-  Object.keys(ST_LABEL).map(k=>'<option value="'+k+'"'+(v===k?' selected':'')+'>'+ST_LABEL[k]+'</option>').join(''); }
-function optRisk(v){ return '<option value=""'+(v?'':' selected')+' disabled>请选择真实风险等级</option>'+
-  RISK_VALUES.map(k=>'<option value="'+k+'"'+(v===k?' selected':'')+'>'+k+'</option>').join(''); }
-
+/* ===== 底部可收起标注复合区：表单与【进入盲审】弹窗完全一致 ===== */
+function formHtml(mine,disabled,arb){
+  const f=state.form;
+  const t=f.type||mine.type||'', r=f.risk||mine.risk||'', n=f.note||mine.note||'';
+  return '<div class="tp-inline">'+
+    '<div class="fld"><label for="truthType">'+(arb?'最终仲裁真值 · ':'')+'差异类型<span class="req">*</span></label>'+
+      '<select id="truthType" class="'+(t?'':'req-empty')+'" aria-required="true"'+disabled+'>'+optType(t,'请选择差异类型')+'</select></div>'+
+    '<div class="fld"><label for="truthRisk">风险等级<span class="req">*</span></label>'+
+      '<select id="truthRisk" class="'+(r?'':'req-empty')+'" aria-required="true"'+disabled+'>'+optRisk(r,'请选择风险等级')+'</select></div>'+
+    '<div class="fld note-fld"><label for="truthNote">审核意见</label>'+
+      '<textarea id="truthNote" placeholder="填写独立判断理由"'+disabled+'>'+esc(n)+'</textarea></div>'+
+  '</div>';
+}
+function isolationHtml(){
+  return '<div class="isolation-note">🔒 双盲隔离：仅显示当前登录人本人的标注，看不到另一方的标注内容；'+
+    '全程屏蔽模型判定结论，页面不提供任何查看模型结论的入口。此处保存与工单列表【进入盲审】弹窗共用同一份工单数据，任一侧保存后另一侧可见本人记录。</div>';
+}
 function arbRecordsHtml(w){
-  if(state.evalRole!=='arbitrator'){
-    return '<div class="arb-box"><div class="ab-t">⚖ 争议仲裁</div>'+
-      '<div class="arb-empty">该工单因多人标注结果不一致已进入【待仲裁】。多方标注记录与最终仲裁真值仅评测仲裁管理员可见，请切换角色处理。</div></div>';
-  }
-  const rows=w.annotations.length? w.annotations.map((a,i)=>
-    '<div class="arb-row"><div class="ar-h">标注 '+(i+1)+' · '+esc(a.reviewer)+' ｜ '+ST_LABEL[a.type]+' / '+esc(a.risk)+'</div>'+
-    '<div class="ar-n">'+(esc(a.note)||'（未填写备注）')+'</div>'+
-    '<div class="ar-n" style="color:var(--ink-3);margin-top:2px;">'+esc(a.time||'')+'</div></div>').join('')
-    : '<div class="arb-empty">暂无多方标注记录。</div>';
-  return '<div class="arb-box"><div class="ab-t">⚖ 多方标注记录（仅评测仲裁管理员可见）</div>'+rows+
-    '<div class="isolation-note">请在右侧录入最终仲裁真值，作为该样本的最终真值；仲裁结论仅回写评测集样本，不修改风险条款库业务样本。</div></div>';
+  const a=w.annotations||{};
+  const rows=['A','B'].map(k=>{
+    const x=a[k];
+    return '<div class="arb-row"><div class="ar-h">阅卷人 '+k+' · '+(x?(ST_LABEL[x.type]||'—')+' / '+esc(x.risk||'—'):'暂无标注')+'</div>'+
+      '<div class="ar-n">'+esc(x&&x.note?x.note:'（未填写审核意见）')+'</div>'+
+      '<div class="ar-n" style="color:var(--ink-3);margin-top:2px;">'+esc(x&&x.time?x.time:'')+'</div></div>';
+  }).join('');
+  return '<div class="arb-box"><div class="ab-t">⚖ 双方标注记录（分歧仲裁 · 仅评测仲裁管理员可见）</div>'+rows+
+    '<div class="isolation-note">请录入最终仲裁真值，工单将变为【已完成】并回写评测集样本；不修改风险条款库业务样本。</div></div>';
 }
-
-function doneHtml(w){
-  const t=w.truth||{};
-  return '<div class="done-banner"><b>✓ 工单状态：复核完成</b> · 最终真值 '+
-    (t.type?ST_LABEL[t.type]:'—')+' / '+esc(t.risk||'—')+'（'+(t.source==='负责人仲裁'?'负责人仲裁':'人工标注')+'）。<br>'+
-    '真值已回写评测集样本 <b>'+esc(w.sampleId)+'</b> 并标记【已标注真值】，用于自动计算准确率、召回率；'+
-    '风险条款库业务样本内容不做任何反向修改。</div>';
-}
-
-function modelUnlockHtml(w){
-  // 仅评测仲裁管理员、且提交真值之后才渲染解锁入口；模型预判内容点击后才注入 DOM
-  if(state.evalRole!=='arbitrator'||!state.submitted||w.status!=='done') return '';
-  const ms=w.modelSnapshot||{};
-  const body = state.modelOpen
-    ? '<div class="model-body" id="modelBody">'+
-        '<div><span class="mb-k">初判差异</span>'+ST_LABEL[ms.type]+'（'+esc(ms.type)+'）</div>'+
-        '<div><span class="mb-k">初判风险</span>'+esc(ms.risk)+'</div>'+
-        '<div><span class="mb-k">规则编号</span><span class="code">'+esc(ms.ruleNo)+'</span></div>'+
-        '<div><span class="mb-k">判定依据</span>'+esc(ms.basis)+'</div>'+
-        '<div><span class="mb-k">快照时间</span>'+esc(w.createdAt||'工单创建时')+'</div></div>'
-    : '';
-  return '<div class="model-unlock">🔓 原始模型预判（提交真值后解锁 · 仅评测仲裁管理员可见）'+
-    '<br><button class="btn btn-sm" id="modelToggle">'+(state.modelOpen?'收起原始模型预判':'查看原始模型预判')+'</button>'+body+'</div>';
-}
-
 function renderTruthPanel(){
-  const w=currentWO(), el=document.getElementById('truthPanel');
-  const editable=canSubmit(w)&&!state.submitted;
-  const disabled=editable?'':' disabled';
-  const title = isArbWO(w) ? '最终仲裁真值录入' : '真值录入';
-  const statusTag='<span class="tag '+WO_STATUS_TAG[w.status]+'">'+WO_STATUS[w.status]+'</span>';
-  let left='';
-  if(state.submitted&&w.status==='done') left=doneHtml(w)+modelUnlockHtml(w);
-  else if(state.submitted&&w.status==='arb') left='<div class="done-banner"><b>⚖ 工单状态：待仲裁</b> · 多人标注结果不一致，工单已自动转为【待仲裁】，待评测仲裁管理员录入最终仲裁真值。</div>';
-  else if(w.status==='done') left=doneHtml(w);
-  else if(!canSubmit(w)){
-    left='<div class="done-banner">'+(state.evalRole==='legal'
-      ? '当前角色为法务业务链路角色，无真值录入权限。'
-      : isArbWO(w) ? '该工单已进入【待仲裁】，仅评测仲裁管理员可录入最终仲裁真值。'
-      : '该工单已完成真值标注，不可重复提交。')+'</div>';
-  } else {
-    const draftHint=w.draft?'<span class="tp-note">已恢复上次暂存内容</span>':'';
-    left=
-      '<div class="fld-row">'+
-        '<div class="fld"><label for="truthType">真实差异类型<span class="req">*</span></label>'+
-          '<select id="truthType" class="'+(state.form.type?'':'req-empty')+(state.reqError.type?' req-error':'')+'" aria-required="true"'+disabled+'>'+optType(state.form.type)+'</select></div>'+
-        '<div class="fld"><label for="truthRisk">真实风险等级<span class="req">*</span></label>'+
-          '<select id="truthRisk" class="'+(state.form.risk?'':'req-empty')+(state.reqError.risk?' req-error':'')+'" aria-required="true"'+disabled+'>'+optRisk(state.form.risk)+'</select></div>'+
-      '</div>'+
-      '<div class="fld" style="margin-top:10px;"><label for="truthNote">备注（选填）</label>'+
-        '<textarea id="truthNote" placeholder="填写标注理由、争议说明"'+disabled+'>'+esc(state.form.note)+'</textarea></div>'+
-      '<div class="req-tip'+(state.reqMsg?' show':'')+'" id="reqTip">'+esc(state.reqMsg)+'</div>'+
-      '<div class="isolation-note">真值仅用于模型评测标注，不回写风险条款库业务样本内容；评测标签与业务库相互隔离。</div>'+draftHint;
+  const w=currentWO(),el=document.getElementById('truthPanel');
+  const mine=myAnnotation(w)||{};
+  const disabled=(w.status==='done'||isLegal())?' disabled':'';
+  el.className='truth-panel'+(state.panelCollapsed?' collapsed':'');
+  let body='';
+  if(w.status==='done'){
+    body='<div class="done-banner"><b>✓ 工单状态：已完成</b> · A / B 双方独立标注已完成，标准真值已生成并回写评测集样本 <b>'+esc(w.sampleId||'—')+'</b>。<br>'+
+      '盲审隔离继续保持：此处不展示另一方标注内容，也不展示任何模型预判结果。</div>'+isolationHtml();
+  }else if(w.status==='arb'){
+    if(isArbitrator()){
+      body=arbRecordsHtml(w)+formHtml({},'',true)+
+        '<div class="tp-actions"><button class="btn btn-primary" id="saveBtn">保存最终仲裁真值</button>'+
+        '<button class="btn" id="returnBtn">返回工单列表</button><div class="spacer"></div>'+
+        '<span class="tp-note">提交后工单变为【已完成】并回写评测集</span></div>';
+    }else{
+      body='<div class="locked-box">⚖ 双方结论不一致，工单已流转至【待仲裁】。<br>'+
+        '当前登录人不可查看另一方标注；请由评测仲裁管理员介入给出最终仲裁真值。</div>'+isolationHtml();
+    }
+  }else if(isArbitrator()||isLegal()){
+    body='<div class="locked-box">🔒 当前登录人为 <b>'+esc(identityLabel())+'</b>，不参与 A / B 盲审标注。<br>'+
+      '请在顶栏切换为阅卷人 A 或阅卷人 B 后独立录入标注。</div>'+isolationHtml();
+  }else{
+    body=formHtml(mine,disabled,false)+isolationHtml()+
+      '<div class="tp-actions"><button class="btn btn-primary" id="saveBtn"'+disabled+'>保存</button>'+
+        '<button class="btn" id="returnBtn">返回工单列表</button><div class="spacer"></div>'+
+        '<span class="tp-note">'+(mine.saved?'本人上次保存 '+esc(mine.time||''):'本人尚未保存标注')+' · 双方均保存后自动比对</span></div>';
   }
-
-  const reviewerPick = (state.evalRole==='annotator'&&!state.submitted)
-    ? '<span class="reviewer-pick">演示切换标注人 <select id="reviewerSel">'+
-        '<option value="A"'+(state.reviewer==='A'?' selected':'')+'>评测审核员 A</option>'+
-        '<option value="B"'+(state.reviewer==='B'?' selected':'')+'>评测审核员 B</option></select></span>'
-    : '';
-
   el.innerHTML=
-    '<div class="tp-head"><div class="tp-title"><span class="line"></span>'+title+'</div>'+statusTag+
-      '<span class="tp-note">工单 '+esc(w.id)+' · '+esc(w.clause)+'</span><div class="spacer"></div>'+reviewerPick+'</div>'+
-    '<div class="tp-grid"><div>'+left+'</div><div>'+
-      (isArbWO(w)||w.annotations.length>1 ? arbRecordsHtml(w)
-        : '<div class="arb-box"><div class="ab-t">◈ 双盲遮蔽说明</div><div class="arb-empty">'+
-          '本工单仅展示合同原文与对齐匹配的标准条款原文，系统预判相关内容已全部屏蔽，且不提供任何切换开关。<br>'+
-          '请仅依据原文独立判断并录入真值，标注全程不展示任何既有判定结论或业务复核意见。<br>'+
-          (w.annotations.length? '已有 '+w.annotations.length+' 方标注；同一样本多人标注结果不一致时，工单将自动转为【待仲裁】。':'')+
-          '</div></div>')+
-    '</div></div>'+
-    '<div class="tp-actions">'+
-      '<button class="btn btn-primary" id="submitBtn"'+disabled+'>'+(isArbWO(w)?'提交仲裁真值':'提交真值')+'</button>'+
-      '<button class="btn" id="draftBtn"'+disabled+'>暂存</button>'+
-      '<button class="btn" id="returnBtn">返回</button>'+   // 恢复路径始终可用，不随提交禁用
-      '<div class="spacer"></div>'+
-      '<span class="tp-note">提交后工单状态变为【复核完成】并自动返回双盲审核工单列表</span>'+
-    '</div>';
-
+    '<div class="tp-head"><div class="tp-title"><span class="line"></span>'+(w.status==='arb'?'最终仲裁真值录入':'独立标注')+'</div>'+
+      statusTag(w.status)+'<span class="tp-note">工单 '+esc(w.id)+' · '+esc(w.clause)+'</span>'+
+      '<div class="spacer"></div><span class="tp-note">当前登录人：'+esc(identityLabel())+'</span>'+
+      '<button class="btn btn-sm" id="panelToggle" aria-expanded="'+(!state.panelCollapsed)+'">'+(state.panelCollapsed?'展开':'收起')+'</button></div>'+
+    '<div class="tp-body">'+body+(state.msg?'<div class="result-line">'+state.msg+'</div>':'')+'</div>';
   bindTruthPanel();
 }
-
 function bindTruthPanel(){
-  const t=document.getElementById('truthType'), r=document.getElementById('truthRisk'), n=document.getElementById('truthNote');
-  if(t) t.addEventListener('change',e=>{ state.form.type=e.target.value; state.reqError.type=false; e.target.classList.remove('req-empty','req-error'); if(!state.form.risk){} else clearReqMsg(); });
-  if(r) r.addEventListener('change',e=>{ state.form.risk=e.target.value; state.reqError.risk=false; e.target.classList.remove('req-empty','req-error'); if(state.form.type) clearReqMsg(); });
-  if(n) n.addEventListener('input',e=>{ state.form.note=e.target.value; });
-  const rs=document.getElementById('reviewerSel');
-  if(rs) rs.addEventListener('change',e=>{ state.reviewer=e.target.value; toast('已切换为评测审核员 '+state.reviewer+'（演示多人独立标注）'); });
-  const sb=document.getElementById('submitBtn'); if(sb) sb.addEventListener('click',submitTruth);
-  const db=document.getElementById('draftBtn'); if(db) db.addEventListener('click',saveDraft);
+  ['truthType','truthRisk','truthNote'].forEach(id=>{
+    const el=document.getElementById(id); if(!el) return;
+    el.addEventListener(el.tagName==='TEXTAREA'?'input':'change',e=>{
+      const k=id==='truthType'?'type':id==='truthRisk'?'risk':'note';
+      state.form[k]=e.target.value; e.target.classList.remove('req-empty');
+    });
+  });
+  const sv=document.getElementById('saveBtn'); if(sv) sv.addEventListener('click',saveHere);
   const rb=document.getElementById('returnBtn'); if(rb) rb.addEventListener('click',backToList);
-  const mt=document.getElementById('modelToggle');
-  if(mt) mt.addEventListener('click',()=>{ state.modelOpen=!state.modelOpen; renderTruthPanel(); });
+  const tg=document.getElementById('panelToggle');
+  if(tg) tg.addEventListener('click',()=>{ state.panelCollapsed=!state.panelCollapsed; renderTruthPanel(); });
 }
-function clearReqMsg(){ state.reqMsg=''; const tip=document.getElementById('reqTip'); if(tip){ tip.classList.remove('show'); tip.textContent=''; } }
-
-/* ===== 操作：必填校验 / 暂存 / 提交 / 返回 ===== */
-function checkRequired(){
-  const miss=[];
-  if(!state.form.type) miss.push({f:'type',n:'真实差异类型'});
-  if(!state.form.risk) miss.push({f:'risk',n:'真实风险等级'});
-  state.reqError={type:!state.form.type,risk:!state.form.risk};
-  if(!miss.length){ state.reqMsg=''; return true; }
-  state.reqMsg='请先选择：'+miss.map(m=>m.n).join('、')+'（均为必填）';
-  renderTruthPanel();
-  const first=document.getElementById(miss[0].f==='type'?'truthType':'truthRisk');
-  if(first&&!first.disabled) first.focus();
-  toast(state.reqMsg);
-  return false;
-}
-function saveDraft(){
+function saveHere(){
   const w=currentWO();
-  w.draft={type:state.form.type,risk:state.form.risk,note:state.form.note,time:nowStr()};
-  w.status=w.status==='done'?'done':'pending';   // 暂存保持【待复核】，可后续继续编辑
-  persist();
-  toast('已暂存真值草稿，工单保持【待复核】，可后续继续编辑');
-  renderTruthPanel();
+  const t=document.getElementById('truthType'),r=document.getElementById('truthRisk'),n=document.getElementById('truthNote');
+  const type=t?t.value:'',risk=r?r.value:'',note=n?n.value:'';
+  if(!type||!risk){ state.form={type:type,risk:risk,note:note}; toast('请先选择差异类型与风险等级（均为必填）'); renderTruthPanel(); return; }
+  const res=w.status==='arb'&&isArbitrator()?finalArbitration(w,type,risk,note):saveAnnotation(w,type,risk,note);
+  if(!res.ok){ toast(res.msg); return; }
+  state.form={type:'',risk:'',note:''}; state.submitted=true;
+  state.msg=res.outcome==='agree'
+    ? '✓ 双方结论一致：工单更新为【已完成】，已生成标准真值并回写评测集样本 '+esc(w.sampleId||'—')+'。'
+    : res.outcome==='conflict'
+      ? '⚖ 双方结论不一致：工单已流转至【待仲裁】，由评测仲裁管理员给出最终仲裁真值。'
+      : res.outcome==='done'
+        ? '✓ 最终仲裁真值已保存：工单更新为【已完成】，真值已回写评测集样本 '+esc(w.sampleId||'—')+'。'
+        : '✓ 标注已保存（'+esc(identityLabel())+'）。工单列表【进入盲审】弹窗打开可看到本人记录；双方均保存后自动比对。';
+  renderAlignBar(w); renderTruthPanel();
+  toast(res.outcome==='agree'?'结论一致，工单已完成':res.outcome==='conflict'?'结论不一致，已转待仲裁':'标注已保存');
+  showResult(state.msg);
 }
-function submitTruth(){
-  const w=currentWO();
-  if(!canSubmit(w)){ toast('当前角色或工单状态不允许提交真值'); return; }
-  if(!checkRequired()) return;
-  state.reqMsg=''; state.reqError={};
-  const rec={type:state.form.type,risk:state.form.risk,note:state.form.note,time:nowStr()};
-
-  if(isArbWO(w)){
-    // 评测负责人录入最终仲裁真值，作为样本最终真值
-    w.truth={type:rec.type,risk:rec.risk,note:rec.note,source:'负责人仲裁',by:reviewerName(),time:rec.time};
-    w.status='done';
-  } else {
-    const me=reviewerName();
-    w.annotations=w.annotations.filter(a=>a.reviewer!==me);
-    w.annotations.push({reviewer:me,type:rec.type,risk:rec.risk,note:rec.note,time:rec.time});
-    const others=w.annotations.filter(a=>a.reviewer!==me);
-    const conflict=others.some(a=>a.type!==rec.type||a.risk!==rec.risk);
-    if(conflict){
-      w.status='arb';   // 同一样本多人标注不一致 → 自动待仲裁
-      w.truth=null;
-    } else {
-      w.status='done';
-      w.truth={type:rec.type,risk:rec.risk,note:rec.note,source:others.length?'双人一致':'单人真值',by:me,time:rec.time};
-    }
-  }
-  if(w.status==='done') writeTruthResult(w);   // 真值与创建时快照配对 → 回写评测集
-  w.draft=null;
-  persist();
-  state.submitted=true;
-  renderTruthPanel();
-  showResult(w);
-}
-
-/* ===== 提交后的数据联动：人工真值 × 创建时模型初判快照 → 回写评测集样本 ===== */
-function writeTruthResult(w){
-  const ms=w.modelSnapshot||{}, t=w.truth||{};
-  const rec={
-    woId:w.id, sampleId:w.sampleId, riskSampleId:w.riskSampleId,
-    stdClause:w.stdClause, clause:w.clause, diff:w.diff,
-    truth:{type:t.type,risk:t.risk,riskCode:RISK_TO_CODE[t.risk]||'none',note:t.note||''},
-    modelSnapshot:{type:ms.type||'mod',risk:ms.risk||'中',riskCode:RISK_TO_CODE[ms.risk]||'mid',ruleNo:ms.ruleNo||'',basis:ms.basis||''},
-    pairedAt:nowStr(), source:t.source||'单人真值', final:true,
-    scope:'eval-only'   // 明确作用域：仅回写评测集样本，不反向修改风险条款库业务样本
-  };
-  const list=allResults();
-  const i=list.findIndex(x=>x.woId===w.id);
-  if(i<0) list.push(rec); else list[i]=rec;
-  _resultCache=list;
-  safeWrite(RESULT_KEY,list);
-}
-
-/* ===== 提交结果弹窗 + 自动返回工单列表 ===== */
-function showResult(w){
-  const isDone=w.status==='done';
-  const head=isDone?'✓ 真值已提交':'⚖ 标注已提交，工单转入待仲裁';
-  let html='<h3>'+head+'</h3><div class="success-line">';
-  html+='<div>工单 <b>'+esc(w.id)+'</b> 状态：<span class="tag '+WO_STATUS_TAG[w.status]+'">'+WO_STATUS[w.status]+'</span></div>';
-  if(isDone){
-    html+='<div>真实差异类型：<b>'+ST_LABEL[w.truth.type]+'</b> ｜ 真实风险等级：<b>'+esc(w.truth.risk)+'</b>（'+esc(w.truth.source||'')+'）</div>'+
-      '<div>后台已将本次人工真值与工单创建时冻结的模型初判快照配对，回写评测集样本 <b>'+esc(w.sampleId)+'</b>，标记【已标注真值】，驱动准确率、召回率自动重算。</div>'+
-      '<div style="color:var(--ink-3);">仅回写评测标签，<b>不反向修改风险条款库业务样本内容</b>；业务库与评测库相互隔离。</div>';
-  } else {
-    html+='<div>同一样本的多人标注结果不一致，工单已自动变为【待仲裁】。</div>'+
-      '<div>评测仲裁管理员进入后可查看多方标注记录并录入最终仲裁真值，作为该样本最终真值。</div>';
-  }
-  html+='</div>';
-  if(isDone&&state.evalRole==='arbitrator'){
-    html+='<div class="model-unlock" style="margin-top:12px;">🔓 原始模型预判已解锁（仅评测仲裁管理员 · 提交真值后可见）'+
-      '<div class="model-body" style="border-top:none;padding-top:6px;">'+
-      '<div><span class="mb-k">初判差异</span>'+ST_LABEL[w.modelSnapshot.type]+'</div>'+
-      '<div><span class="mb-k">初判风险</span>'+esc(w.modelSnapshot.risk)+'</div>'+
-      '<div><span class="mb-k">规则编号</span>'+esc(w.modelSnapshot.ruleNo)+'</div>'+
-      '<div><span class="mb-k">判定依据</span>'+esc(w.modelSnapshot.basis)+'</div></div></div>';
-  }
-  html+='<div style="display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;">'+
-    '<button class="btn btn-primary" id="resultBack">返回双盲审核工单列表</button>'+
-    '<span class="countdown" id="countdown">2.8 秒后自动返回…</span></div>';
-  document.getElementById('resultBody').innerHTML=html;
+function showResult(text){
+  document.getElementById('resultBody').innerHTML='<h3>标注已保存</h3><div class="success-line">'+text+'</div>'+
+    '<div style="display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;">'+
+    '<button class="btn btn-primary" id="resultBack">返回工单列表</button>'+
+    '<button class="btn" id="resultStay">留在本页</button>'+
+    '<span class="countdown">状态与标注已实时写入统一工单，不会自动跳转</span></div>';
   document.getElementById('resultMask').classList.add('show');
   document.getElementById('resultBack').addEventListener('click',backToList);
-
-  // 自动跳转回双盲审核工单列表（页面11），URL 参数兜底状态同步
-  state.redirectUrl=buildBackUrl(w,true);
-  document.getElementById('backBtn').dataset.href=state.redirectUrl;
-  if(!location.search.includes('nojump=1')){
-    setTimeout(()=>{ window.location.href=state.redirectUrl; },2800);
-  }
+  document.getElementById('resultStay').addEventListener('click',()=>document.getElementById('resultMask').classList.remove('show'));
 }
-/* 返回工单列表：带工单元信息，便于列表在 localStorage 不可用时仍可重建该工单 */
-function buildBackUrl(w,submitted){
-  const q=new URLSearchParams({
-    woId:w.id, woStatus:w.status, truthBack:submitted?'1':'0', role:state.role,
-    sampleId:w.sampleId, clause:w.clause, diff:w.diff, contract:w.contract
-  });
-  return 'page11.html?'+q.toString();
-}
-function backToList(){ window.location.href=buildBackUrl(currentWO(),state.submitted); }
 
-/* ===== 权限 ===== */
+/* ===== 查看完整合同上下文：跳【页面5】盲审只读模式（三栏），query 恒在 hash 前 ===== */
+function openFullContext(){
+  const w=currentWO();
+  const q=new URLSearchParams({blind:'1',woId:w.id,diff:w.diff,role:state.role,
+    reviewer:currentReviewer(),evalRole:isArbitrator()?'arbitrator':(isLegal()?'legal':'annotator')});
+  window.location.href='page5.html?'+q.toString()+'#'+encodeURIComponent(w.diff);
+}
+function backToList(){
+  const w=currentWO();
+  const q=new URLSearchParams({woId:w.id,truthBack:'1',role:state.role,reviewer:currentReviewer()});
+  window.location.href='page11.html?'+q.toString();
+}
+
+/* ===== 权限 / 绑定 / 初始化 ===== */
 function applyPerm(){
-  document.body.classList.toggle('role-legal',state.evalRole==='legal');
-  document.body.classList.toggle('role-annotator',state.evalRole==='annotator');
-  document.body.classList.toggle('role-arbitrator',state.evalRole==='arbitrator');
-  document.getElementById('permHint').textContent=EVAL_ROLE_LABEL[state.evalRole];
-  document.getElementById('evalRoleSel').value=state.evalRole;
+  document.body.classList.toggle('role-legal',isLegal());
+  document.body.classList.toggle('role-annotator',!isLegal()&&!isArbitrator());
+  document.body.classList.toggle('role-arbitrator',isArbitrator());
+  document.getElementById('permHint').textContent='';   // 身份由顶栏下拉显示，避免重复文案
+  document.getElementById('evalRoleSel').value=currentIdentity();
   document.querySelectorAll('.sb-admin-only').forEach(el=>{ el.style.display=state.role==='admin'?'flex':'none'; });
-  renderTruthPanel();
+  renderAlignBar(currentWO()); renderTruthPanel();
 }
-
-/* ===== 绑定 ===== */
 function bind(){
   document.getElementById('evalRoleSel').addEventListener('change',e=>{
-    state.evalRole=e.target.value; applyPerm();
-    if(state.evalRole==='legal') toast('法务业务复核链路与评测工单体系隔离，无访问权限');
+    setIdentity(e.target.value);
+    state.form={type:'',risk:'',note:''}; state.msg='';
+    applyPerm(); toast('已切换当前登录人为 '+identityLabel());
   });
   document.getElementById('sbToggle').addEventListener('click',()=>{ document.getElementById('sidebar').classList.toggle('collapsed'); });
   document.getElementById('viewSeg').addEventListener('click',e=>{
@@ -786,6 +792,7 @@ function bind(){
   document.getElementById('syncSwitch').addEventListener('click',e=>{
     state.sync=!state.sync; e.currentTarget.classList.toggle('on',state.sync);
   });
+  document.getElementById('ctxBtn').addEventListener('click',openFullContext);
   document.querySelectorAll('.sb-item[data-nav], .sb-sub[data-nav]').forEach(it=>{
     it.addEventListener('click',()=>{
       const cfg=NAV[it.dataset.nav];
@@ -795,27 +802,15 @@ function bind(){
     });
   });
 }
-
-/* ===== 初始化 ===== */
 (function init(){
   const p=new URLSearchParams(location.search);
   const r=p.get('role'); if(r) state.role=r;
-  const er=p.get('evalRole'); if(er&&EVAL_ROLE_LABEL[er]) state.evalRole=er;
-  // 入口白名单：仅评测集列表（eval）与双盲审核工单列表（qc）可进入，业务链路不得作为入口
-  state.from = (p.get('from')==='eval'||p.get('from')==='qc') ? p.get('from') : 'qc';
-  const w=ensureWorkOrder(p);
-  state.woId=w.id;
-  // 已有 A 标注且 B 未标注时，默认由第二位标注人接手（便于演示多人独立标注 → 分歧仲裁）
-  if(w.annotations.some(a=>a.reviewer==='评测审核员 A')&&!w.annotations.some(a=>a.reviewer==='评测审核员 B')) state.reviewer='B';
-  // 暂存草稿回填
-  if(w.draft) state.form={type:w.draft.type||'',risk:w.draft.risk||'',note:w.draft.note||''};
-  // 已完成工单回显最终真值（只读）
-  if(w.status==='done'&&w.truth) state.form={type:w.truth.type||'',risk:w.truth.risk||'',note:w.truth.note||''};
-  renderAlignBar(w);
-  renderPanes(w);
-  setTimeout(bindSyncScroll,200);   // 延后绑定，避免初始章节定位触发的滚动事件被按比例二次同步
-  applyPerm();
-  bind();
+  state.from=(p.get('from')==='eval'||p.get('from')==='qc')?p.get('from'):'qc';
+  const w=ensureWorkOrder(p); state.woId=w.id;
+  renderAlignBar(w); renderPanes(w);
+  setTimeout(bindSyncScroll,200);
+  applyPerm(); bind();
+  if(p.get('blindBack')==='1') setTimeout(()=>toast('已从完整合同上下文返回，标注记录保持不变'),300);
 })();
 </script>
 
