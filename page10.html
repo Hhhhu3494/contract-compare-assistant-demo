@@ -224,7 +224,7 @@
         <div class="sb-group" data-group="qc">
           <div class="sb-item sb-parent" data-nav="qc"><span class="ico">✓</span><span>双盲审核工单</span><span class="sb-caret">▸</span></div>
           <div class="sb-children">
-            <div class="sb-sub" data-nav="truthWO" title="双盲真值复核工单详情页"><span class="ico">›</span><span>双盲真值复核详情</span></div>
+            <div class="sb-sub" data-nav="truthWO" title="复核工单详情"><span class="ico">›</span><span>复核工单详情</span></div>
           </div>
         </div>
         <div class="sb-item" data-nav="rule"><span class="ico">⚙</span><span>风控规则配置</span></div>
@@ -692,7 +692,7 @@ function renderTable(){
       '<td class="time-nw">'+createdOf(e)+'</td>'+
       '<td><div class="op">'+
         (canLaunchBlind(e)
-          ? '<button class="btn btn-sm btn-launch" title="跳转双盲真值复核工单详情，自动带入合同原文与匹配标准条款" onclick="launchBlind(\''+e.id+'\')">发起双盲复核</button>'
+          ? '<button class="btn btn-sm btn-launch" title="跳转复核工单详情，自动带入合同原文与匹配标准条款" onclick="launchBlind(\''+e.id+'\')">发起双盲复核</button>'
           : '<button class="btn btn-sm" disabled title="仅风险条款库「已启用」的入库样本可发起双盲复核">发起双盲复核</button>')+
         '<button class="btn btn-sm btn-primary" onclick="traceCompare(\''+e.id+'\')">溯源原文比对视图</button>'+
         '<button class="btn btn-sm" onclick="doRemove(\''+e.id+'\')">移除</button>'+

@@ -182,7 +182,7 @@
         <div class="sb-group" data-group="qc">
           <div class="sb-item sb-parent active" data-nav="qc"><span class="ico">✓</span><span>双盲审核工单</span><span class="sb-caret">▸</span></div>
           <div class="sb-children">
-            <div class="sb-sub" data-nav="truthWO" title="双盲真值复核工单详情页"><span class="ico">›</span><span>双盲真值复核详情</span></div>
+            <div class="sb-sub" data-nav="truthWO" title="复核工单详情"><span class="ico">›</span><span>复核工单详情</span></div>
           </div>
         </div>
         <div class="sb-item" data-nav="rule"><span class="ico">⚙</span><span>风控规则配置</span></div>
@@ -345,7 +345,7 @@ function renderTruthSync(){
   if(!rs.length&&!woCount){ el.style.display='none'; return; }
   el.style.display='block';
   el.innerHTML='<b>独立真值复核工单体系</b>：共 '+woCount+' 条双盲真值工单，已回写人工真值 <b>'+rs.length+'</b> 条。'+
-    '<span style="color:var(--ink-3);">真值标注与法务业务复核工单完全隔离；点击【去复核】进入双盲真值复核工单详情页录入真值。</span>';
+    '<span style="color:var(--ink-3);">真值标注与法务业务复核工单完全隔离；点击【去复核】进入复核工单详情录入真值。</span>';
 }
 /* 入口2：每行【去复核】→ 页面14（待仲裁工单自动以评测仲裁管理员身份进入，便于查看多方标注） */
 function goTruth(id){

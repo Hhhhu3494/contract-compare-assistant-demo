@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>双盲真值复核工单详情 · 合同对比助手</title>
+<title>复核工单详情 · 合同对比助手</title>
 <script src="tailwind.js"></script>
 <style>
   :root{
@@ -191,7 +191,7 @@
       <div class="sb-group" data-group="qc">
         <div class="sb-item sb-parent" data-nav="qc"><span class="ico">✓</span><span>双盲审核工单</span><span class="sb-caret">▸</span></div>
         <div class="sb-children">
-          <div class="sb-sub active" data-nav="truthWO" title="双盲真值复核工单详情页"><span class="ico">›</span><span>双盲真值复核详情</span></div>
+          <div class="sb-sub active" data-nav="truthWO" title="复核工单详情"><span class="ico">›</span><span>复核工单详情</span></div>
         </div>
       </div>
       <div class="sb-item" data-nav="rule"><span class="ico">⚙</span><span>风控规则配置</span></div>
@@ -209,8 +209,8 @@
       <button class="icon-btn" id="sbToggle" title="收起/展开侧边栏">☰</button>
       <button class="icon-btn" id="backBtn" title="返回上一页" onclick="history.back()">‹</button>
       <div>
-        <h1>双盲真值复核工单详情</h1>
-        <div class="crumb">合同对比助手 / 双盲审核工单 / 真值录入（二期 · 独立评测工单体系）</div>
+        <h1>复核工单详情</h1>
+        <div class="crumb">合同对比助手 / 双盲审核工单 / 复核工单详情（二期 · 独立评测工单体系）</div>
       </div>
       <div class="top-right">
         <span class="lock-note" id="permHint"></span>
@@ -281,7 +281,7 @@
 
 <script>
 /* ==========================================================================
-   双盲真值复核工单详情（页面14）
+   复核工单详情（页面14）
    - 独立工单体系：与【页面5】法务业务复核工单完全隔离，独立 key / 独立状态机
    - 入口仅来自【页面10】评测集样本表格 /【页面11】双盲审核工单列表
    - 存储策略：内存权威 + localStorage 尽力持久化 + URL 参数兜底
