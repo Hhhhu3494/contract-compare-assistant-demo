@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>合同详情 · 合同对比助手</title>
+<script src="tailwind.js"></script>
+<style>
+  :root{
+    --brand:#165DFF; --brand-weak:#E8F3FF; --ink-1:#1D2129; --ink-2:#4E5969; --ink-3:#86909C;
+    --line:#E5E6EB; --bg:#F7F8FA; --card:#fff;
+    --c-add:#B3E8C0; --c-del:#FFBFBF; --c-mod:#FFD9A8;
+    --risk-high:#F53F3F; --risk-mid:#D25F00; --risk-low:#00875A; --risk-none:#86909C;
+    --review-bg:#E9D5FF; --review-text:#6B21A8; --review-bd:#9333EA;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink-1);background:var(--bg);font-size:13px;}
+  .app{display:flex;flex-direction:row;height:100vh;overflow:hidden;}
+  /* 侧边导航（全站统一） */
+  .sidebar{width:220px;flex:0 0 220px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;transition:width .18s ease;min-height:0;}
+  .sidebar.collapsed{width:64px;flex-basis:64px;}
+  .sb-brand{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);height:56px;white-space:nowrap;overflow:hidden;}
+  .sidebar.collapsed .sb-brand span{display:none;}
+  .logo{width:30px;height:30px;border-radius:6px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:0 0 30px;}
+  .sb-nav{flex:1;overflow:auto;padding:8px;min-height:0;}
+  .sb-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;color:var(--ink-2);cursor:pointer;margin-bottom:2px;white-space:nowrap;overflow:hidden;}
+  .sb-item:hover{background:var(--bg);}
+  .sb-item.active{background:var(--brand-weak);color:var(--brand);font-weight:600;}
+  .sb-sub{padding-left:34px;font-size:13px;color:var(--ink-3);}
+  .sb-sub .ico{opacity:.5;}
+  .sb-sub:hover{background:var(--bg);}
+  .sb-sub.active{background:var(--brand-weak);color:var(--brand);font-weight:600;}
+  .sidebar.collapsed .sb-sub span{display:none;}
+  .code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--ink-2);}
+  .sb-item .ico{width:18px;height:18px;flex:0 0 18px;display:flex;align-items:center;justify-content:center;}
+  .sidebar.collapsed .sb-item span{display:none;}
+  .sb-foot{padding:10px 14px;border-top:1px solid var(--line);font-size:11px;color:var(--ink-3);line-height:1.7;white-space:nowrap;overflow:hidden;}
+  .sidebar.collapsed .sb-foot{display:none;}
+  .sb-toggle{position:absolute;top:64px;left:206px;width:22px;height:22px;border-radius:50%;background:#fff;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;color:var(--ink-3);transition:left .18s ease;}
+  .sidebar.collapsed .sb-toggle{left:50px;}
+  /* 主区 */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;}
+  .topbar{height:56px;flex:0 0 56px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 18px;}
+  .topbar h1{font-size:16px;margin:0;}
+  .topbar .crumb{font-size:12px;color:var(--ink-3);margin-top:2px;}
+  .top-right{display:flex;align-items:center;gap:12px;}
+  .role-sel{border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-size:12px;color:var(--ink-1);background:#fff;}
+  .content{flex:1;overflow:auto;padding:18px;min-height:0;}
+  /* 基础信息卡片 */
+  .info-card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:16px 18px;margin-bottom:14px;}
+  .info-card h2{margin:0 0 12px;font-size:15px;}
+  .info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px 24px;}
+  .info-grid .k{font-size:12px;color:var(--ink-3);}
+  .info-grid .v{font-size:13px;color:var(--ink-1);margin-top:2px;font-weight:500;}
+  /* 正文预览 */
+  .preview{background:#fff;border:1px solid var(--line);border-radius:8px;padding:16px 18px;margin-bottom:14px;}
+  .preview h3{margin:0 0 10px;font-size:14px;}
+  .clause{padding:8px 10px;border-radius:4px;margin-bottom:6px;border-left:3px solid transparent;line-height:1.7;font-size:13px;}
+  .clause.review{background:var(--review-bg);border-left-color:var(--review-bd);}
+  .clause .flag{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:4px;font-size:11px;font-weight:600;background:var(--review-bg);color:var(--review-text);border:1px solid var(--review-bd);}
+  /* Tabs */
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);background:#fff;border-radius:8px 8px 0 0;border:1px solid var(--line);border-bottom:none;padding:0 12px;}
+  .tab{padding:11px 16px;font-size:13px;color:var(--ink-2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .tab:hover{color:var(--brand);}
+  .tab.active{color:var(--brand);font-weight:600;border-bottom-color:var(--brand);}
+  .tab-body{background:#fff;border:1px solid var(--line);border-radius:0 0 8px 8px;padding:16px 18px;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+  table{width:100%;border-collapse:collapse;}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:middle;}
+  th{background:#FAFBFC;color:var(--ink-3);font-weight:600;font-size:12px;}
+  tbody tr:hover{background:var(--brand-weak);}
+  .tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;line-height:1.5;}
+  .st-draft{background:#FFF7E8;color:var(--risk-mid);}
+  .st-active{background:#E8FFEA;color:var(--risk-low);}
+  .st-reviewing{background:var(--brand-weak);color:var(--brand);}
+  .st-arch{background:#F2F3F5;color:var(--ink-3);}
+  .st-done{background:#E8FFEA;color:var(--risk-low);}
+  .t-review{background:var(--review-bg);color:var(--review-text);border:1px solid var(--review-bd);}
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink-1);border-radius:4px;padding:5px 10px;font-size:12px;cursor:pointer;}
+  .btn:hover{background:var(--bg);}
+  .btn-primary{background:var(--brand);border-color:var(--brand);color:#fff;}
+  .btn-primary:hover{background:#0E4AD0;}
+  .btn-sm{padding:3px 8px;font-size:12px;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .op{display:flex;gap:6px;flex-wrap:wrap;}
+  .ver-bar{display:flex;align-items:center;gap:12px;margin-top:12px;background:var(--brand-weak);border:1px solid #BEDAFF;border-radius:6px;padding:8px 12px;font-size:13px;color:var(--brand);}
+  .role-procurement .ver-bar .btn-primary{display:none;}
+  .role-procurement .ver-sel{display:none;}
+  .lock-note{font-size:12px;color:var(--ink-3);}
+  /* 审批时间线 */
+  .timeline{position:relative;padding-left:18px;}
+  .timeline::before{content:'';position:absolute;left:5px;top:4px;bottom:4px;width:2px;background:var(--line);}
+  .tl-item{position:relative;padding:0 0 16px 14px;}
+  .tl-item::before{content:'';position:absolute;left:-18px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--brand);border:2px solid #fff;box-shadow:0 0 0 1px var(--line);}
+  .tl-item.done::before{background:var(--risk-low);}
+  .tl-item.wait::before{background:var(--ink-3);}
+  .tl-title{font-size:13px;font-weight:600;}
+  .tl-meta{font-size:12px;color:var(--ink-3);margin-top:2px;}
+  /* 弹窗 */
+  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:100;}
+  .modal-mask.show{display:flex;}
+  .modal-box{position:relative;}
+  .modal{background:#fff;border-radius:8px;width:min(440px,92vw);max-height:86vh;overflow:auto;padding:22px;}
+  .modal h3{margin:0 0 14px;font-size:16px;}
+  .modal-close{position:absolute;top:-14px;right:-14px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border:none;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.18);font-size:20px;line-height:1;color:var(--ink-3);cursor:pointer;border-radius:6px;z-index:2;}
+  .modal-close:hover{background:#F2F3F5;color:var(--ink-1);}
+  .toast{position:fixed;left:50%;top:24px;transform:translateX(-50%);background:rgba(29,33,41,.92);color:#fff;padding:9px 16px;border-radius:6px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:200;}
+  .toast.show{opacity:1;}
+.icon-btn{border:1px solid var(--line);background:#fff;border-radius:4px;width:30px;height:30px;cursor:pointer;color:var(--ink-2);font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;flex:0 0 30px;}
+.icon-btn:hover{border-color:var(--brand);color:var(--brand);}
+.topbar{gap:12px;}
+.top-right{margin-left:auto;}
+.sidebar.collapsed .sb-item span,.sidebar.collapsed .sb-sub span{display:none;}
+
+  /* 二级菜单手风琴 */
+  .sb-children{display:none;}
+  .sb-group.open .sb-children{display:block;}
+  .sb-caret{margin-left:auto;font-size:11px;line-height:1;color:var(--ink-3);transition:transform .15s;transform:rotate(0deg);}
+  .sb-group.open > .sb-parent .sb-caret{transform:rotate(90deg);}
+  .sb-children .sb-sub{padding-left:32px;}
+  .sidebar.collapsed .sb-children{display:none!important;}
+  .sidebar.collapsed .sb-caret{display:none;}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 侧边导航（全站统一） -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-brand"><div class="logo">C</div><span>合同对比助手</span></div>
+          <div class="sb-nav" id="sbNav">
+        <div class="sb-group" data-group="ledger">
+          <div class="sb-item sb-parent active" data-nav="ledger"><span class="ico">▤</span><span>合同台账</span><span class="sb-caret">▸</span></div>
+          <div class="sb-children">
+            <div class="sb-sub" data-nav="detail"><span class="ico">›</span><span>合同详情</span></div>
+          </div>
+        </div>
+        <div class="sb-group" data-group="tasks">
+          <div class="sb-item sb-parent" data-nav="tasks"><span class="ico">☰</span><span>比对任务管理</span><span class="sb-caret">▸</span></div>
+          <div class="sb-children">
+            <div class="sb-sub" data-nav="new"><span class="ico">＋</span><span>新建比对任务</span></div>
+            <div class="sb-sub" data-nav="review"><span class="ico">✎</span><span>对比复核页</span></div>
+          </div>
+        </div>
+        <div class="sb-group" data-group="std">
+          <div class="sb-item sb-parent" data-nav="std"><span class="ico">📘</span><span>标准条款库</span><span class="sb-caret">▸</span></div>
+          <div class="sb-children">
+            <div class="sb-sub" data-nav="clauseDetail"><span class="ico">›</span><span>条款详情&amp;版本对比</span></div>
+          </div>
+        </div>
+        <div class="sb-item" data-nav="risk"><span class="ico">⚠</span><span>风险条款库</span></div>
+        <div class="sb-item" data-nav="eval"><span class="ico">📊</span><span>评测集管理</span></div>
+        <div class="sb-item" data-nav="qc"><span class="ico">✓</span><span>双盲审核工单</span></div>
+        <div class="sb-item" data-nav="rule"><span class="ico">⚙</span><span>风控规则配置</span></div>
+        <div class="sb-group" data-group="archive">
+          <div class="sb-item sb-parent" data-nav="archive"><span class="ico">🗄</span><span>复核报告归档</span><span class="sb-caret">▸</span></div>
+          <div class="sb-children">
+            <div class="sb-sub" data-nav="reportDetail"><span class="ico">›</span><span>复核报告详情</span></div>
+          </div>
+        </div>
+        <div class="sb-item sb-admin-only" data-nav="setting" style="display:none;"><span class="ico">⚷</span><span>系统权限设置</span></div>
+      </div>
+    <div class="sb-foot">一期 规则引擎+差异模型<br>二期 样本相似度+难例挖掘<br>无大模型自动解读</div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+        <button class="icon-btn" id="sbToggle" title="收起/展开侧边栏">☰</button>
+        <button class="icon-btn" id="backBtn" title="返回上一页" onclick="history.back()">‹</button>
+      <div>
+        <h1>合同详情</h1>
+        <div class="crumb">合同对比助手 / 合同台账 / 华东精密年度采购主协议</div>
+      </div>
+      <div class="top-right">
+        <span class="lock-note" id="permHint"></span>
+        <label class="lock-note">角色</label>
+        <select class="role-sel" id="roleSel">
+          <option value="procurement">采购专员</option>
+          <option value="legal" selected>法务审核员</option>
+          <option value="admin">管理员</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- 基础信息卡片 -->
+      <div class="info-card">
+        <h2>华东精密年度采购主协议 <span class="tag st-active">生效中</span> <span class="tag t-review">待重点复核 3 条</span></h2>
+        <div class="info-grid">
+          <div><div class="k">合同编号</div><div class="v code">HT-2026-001837</div></div>
+          <div><div class="k">相对方（供应商）</div><div class="v">华东精密制造有限公司</div></div>
+          <div><div class="k">合同类型</div><div class="v">采购主协议</div></div>
+          <div><div class="k">合同金额</div><div class="v">¥ 12,800,000.00</div></div>
+          <div><div class="k">负责人</div><div class="v">李法务</div></div>
+          <div><div class="k">签订日期</div><div class="v">2026-09-15</div></div>
+          <div><div class="k">关联项目</div><div class="v">PRJ-2026-0831</div></div>
+          <div><div class="k">当前版本</div><div class="v">V3.2</div></div>
+        </div>
+      </div>
+
+      <!-- 合同正文预览 -->
+      <div class="preview">
+        <h3>合同正文预览</h3>
+        <div class="clause">第一条 标的物：甲方向乙方采购精密机械加工件，规格见附件一《技术参数清单》。</div>
+        <div class="clause review">第二条 付款条款：货到验收合格后 60 日内支付合同总价的 95%，余 5% 作为质保金于质保期满支付。<span class="flag">待重点复核</span></div>
+        <div class="clause">第三条 交付周期：乙方应于每月 25 日前交付当月订单量的 100%。</div>
+        <div class="clause review">第四条 违约责任：逾期交付按日加收 0.3% 违约金，上限不超过合同总价 15%。<span class="flag">待重点复核</span></div>
+        <div class="clause review">第五条 争议解决：提交甲方所在地仲裁委员会仲裁。<span class="flag">待重点复核</span></div>
+      </div>
+
+      <!-- 4 个 Tab -->
+      <div class="tabs" id="tabs">
+        <div class="tab active" data-tab="base">基本信息</div>
+        <div class="tab" data-tab="version">版本记录</div>
+        <div class="tab" data-tab="compare">比对记录</div>
+        <div class="tab" data-tab="approval">审批记录</div>
+      </div>
+      <div class="tab-body">
+        <!-- 基本信息 -->
+        <div class="panel active" id="panel-base">
+          <div class="info-grid">
+            <div><div class="k">所属部门</div><div class="v">采购中心 / 战略采购组</div></div>
+            <div><div class="k">币种</div><div class="v">人民币（CNY）</div></div>
+            <div><div class="k">生效日期</div><div class="v">2026-09-20</div></div>
+            <div><div class="k">到期日期</div><div class="v">2027-09-19</div></div>
+            <div><div class="k">付款方式</div><div class="v">电汇 / 银行承兑</div></div>
+            <div><div class="k">质保期</div><div class="v">验收合格起 12 个月</div></div>
+            <div><div class="k">归档状态</div><div class="v">未归档</div></div>
+            <div><div class="k">备注</div><div class="v">年度框架，按 PO 分批执行</div></div>
+          </div>
+        </div>
+        <!-- 版本记录 -->
+        <div class="panel" id="panel-version">
+          <table>
+            <thead><tr><th style="width:36px;" class="ver-sel"></th><th>版本</th><th>说明</th><th>上传人</th><th>时间</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr><td class="ver-sel"><input type="checkbox" class="ver-cb" data-ver="V3.2"></td><td class="code">V3.2</td><td>法务定稿版</td><td>李法务</td><td class="code">2026-09-15</td><td><button class="btn btn-sm" onclick="viewVer('V3.2')">预览</button></td></tr>
+              <tr><td class="ver-sel"><input type="checkbox" class="ver-cb" data-ver="V3.1"></td><td class="code">V3.1</td><td>采购修订版</td><td>王采购</td><td class="code">2026-09-10</td><td><button class="btn btn-sm" onclick="viewVer('V3.1')">预览</button></td></tr>
+              <tr><td class="ver-sel"><input type="checkbox" class="ver-cb" data-ver="V3.0"></td><td class="code">V3.0</td><td>初稿</td><td>王采购</td><td class="code">2026-09-02</td><td><button class="btn btn-sm" onclick="viewVer('V3.0')">预览</button></td></tr>
+              <tr><td class="ver-sel"><input type="checkbox" class="ver-cb" data-ver="V2.0"></td><td class="code">V2.0</td><td>历史归档版</td><td>系统</td><td class="code">2025-08-20</td><td><button class="btn btn-sm" onclick="viewVer('V2.0')">预览</button></td></tr>
+            </tbody>
+          </table>
+          <div class="ver-bar">
+            <span id="verInfo">请勾选两个版本进行比对</span>
+            <button class="btn btn-primary btn-sm" id="verCompareBtn" onclick="compareVer()">双版本勾选发起比对</button>
+            <span class="lock-note role-procurement-inline" id="verLock" style="display:none;">采购专员无版本比对权限</span>
+          </div>
+        </div>
+        <!-- 比对记录 -->
+        <div class="panel" id="panel-compare">
+          <table>
+            <thead><tr><th>任务名</th><th>比对模式</th><th>时间</th><th>状态</th><th>待重点复核</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr><td>华东精密 V3.2 vs 标准模板</td><td>标准合同 VS 供应商待审</td><td class="code">2026-11-03 09:12</td><td><span class="tag st-reviewing">复核中</span></td><td><span class="tag t-review">3 条</span></td><td><button class="btn btn-sm btn-primary" onclick="go('page5.html')">查看复核</button></td></tr>
+              <tr><td>华东精密 V3.1 vs V3.0</td><td>历史版本对比</td><td class="code">2026-09-12 10:30</td><td><span class="tag st-done">已完成</span></td><td><span class="tag t-review">1 条</span></td><td><button class="btn btn-sm" onclick="go('page5.html')">查看复核</button></td></tr>
+              <tr><td>华东精密 V3.0 vs 标准模板</td><td>标准合同 VS 供应商待审</td><td class="code">2026-09-03 14:05</td><td><span class="tag st-arch">已归档</span></td><td><span class="tag t-review">2 条</span></td><td><button class="btn btn-sm" onclick="go('page5.html')">查看复核</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- 审批记录 -->
+        <div class="panel" id="panel-approval">
+          <div class="timeline">
+            <div class="tl-item done"><div class="tl-title">合同起草</div><div class="tl-meta">王采购 · 2026-09-02 09:00</div></div>
+            <div class="tl-item done"><div class="tl-title">采购初审</div><div class="tl-meta">王采购 · 2026-09-10 16:20</div></div>
+            <div class="tl-item done"><div class="tl-title">法务复核</div><div class="tl-meta">李法务 · 2026-09-15 11:40</div></div>
+            <div class="tl-item done"><div class="tl-title">管理员审批通过</div><div class="tl-meta">赵管理员 · 2026-09-18 15:00</div></div>
+            <div class="tl-item wait"><div class="tl-title">归档（待执行）</div><div class="tl-meta">待管理员强制归档</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const NAV = {
+  ledger:{url:'page1.html'},
+  tasks:{url:'page3.html'},
+  new:{url:'page4.html'},
+  std:{url:'page6.html'}, risk:{url:'page9.html'}, eval:{url:'page10.html'}, qc:{url:'page11.html'}, rule:{url:'page12.html'}, archive:{url:'page13.html'},
+  detail:{url:'page2.html'},
+  review:{url:'page5.html'},
+  clauseDetail:{url:'page7.html'},
+  reportDetail:{url:'page8.html'},
+ setting:{}
+};
+const ROLE_LABEL = {procurement:'采购专员（只读）', legal:'法务审核员（全查看）', admin:'管理员（全权限）'};
+const state = { role:'legal' };
+
+function go(url){ window.location.href = url + (url.indexOf('?')>-1?'&':'?') + 'role=' + state.role; }
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2000);
+}
+function viewVer(v){ toast('预览版本 '+v+'（演示）'); }
+
+/* Tab 切换 */
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+  });
+});
+
+/* 双版本勾选发起比对 */
+document.querySelectorAll('.ver-cb').forEach(cb=>{
+  cb.addEventListener('change',updateVerInfo);
+});
+function selectedVers(){ return [...document.querySelectorAll('.ver-cb:checked')].map(c=>c.dataset.ver); }
+function updateVerInfo(){
+  const s=selectedVers();
+  document.getElementById('verInfo').textContent = s.length<2 ? ('已选 '+s.length+' 个，请再勾选一个版本进行比对') : ('已选 '+s.length+' 个：'+s.join(' / '));
+}
+function compareVer(){
+  if(state.role==='procurement'){ toast('采购专员无版本比对权限'); return; }
+  const s=selectedVers();
+  if(s.length<2){ toast('请至少勾选两个版本'); return; }
+  toast('已对 '+s.join(' / ')+' 发起比对（演示）');
+  // 跳转到新建比对任务页
+  setTimeout(()=>go('page4.html'), 600);
+}
+
+/* 权限 */
+function applyPerm(){
+  document.body.classList.toggle('role-procurement', state.role==='procurement');
+  document.getElementById('permHint').textContent=ROLE_LABEL[state.role];
+  document.querySelectorAll('.sb-admin-only').forEach(el=>{ el.style.display = state.role==='admin'?'flex':'none'; });
+  // 采购：版本勾选禁用 + 显示锁定提示，比对按钮隐藏
+  document.querySelectorAll('.ver-cb').forEach(cb=>{ cb.disabled = state.role==='procurement'; });
+  document.getElementById('verLock').style.display = state.role==='procurement' ? 'inline' : 'none';
+}
+
+/* 导航 */
+document.querySelectorAll('.sb-item[data-nav], .sb-sub[data-nav]').forEach(el=>{
+  el.addEventListener('click',()=>{
+    const nav=el.dataset.nav; const cfg=NAV[nav];
+    if(cfg&&cfg.url){ go(cfg.url); return; }
+    toast('「'+(el.querySelector('span:last-child')?el.querySelector('span:last-child').textContent:'')+'」模块演示中');
+  });
+});
+document.getElementById('sbToggle').addEventListener('click',()=>{
+  document.getElementById('sidebar').classList.toggle('collapsed');
+});
+document.getElementById('roleSel').addEventListener('change',e=>{ state.role=e.target.value; applyPerm(); });
+
+/* 初始化：读取 URL 角色，保持跨页一致 */
+(function init(){
+  const p=new URLSearchParams(location.search);
+  const r=p.get('role');
+  if(r&&['procurement','legal','admin'].includes(r)){ state.role=r; document.getElementById('roleSel').value=r; }
+  applyPerm();
+})();
+</script>
+
+<script>
+(function(){
+  function toggleGroup(p){
+    var g=p.closest('.sb-group');
+    if(!g) return;
+    var willOpen=!g.classList.contains('open');
+    document.querySelectorAll('#sbNav .sb-group').forEach(function(x){x.classList.remove('open');});
+    if(willOpen) g.classList.add('open');
+  }
+  document.querySelectorAll('#sbNav .sb-group > .sb-parent').forEach(function(p){
+    p.addEventListener('click', function(){ toggleGroup(p); });
+  });
+  // 初始：仅展开含 active 项的组（其余折叠，满足手风琴默认折叠）
+  var act=document.querySelector('#sbNav .sb-item.active, #sbNav .sb-sub.active');
+  if(act){ var g=act.closest('.sb-group'); if(g) g.classList.add('open'); }
+})();
+</script>
+</body>
+</html>

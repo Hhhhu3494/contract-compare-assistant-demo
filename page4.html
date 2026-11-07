@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>新建比对任务 · 合同对比助手</title>
+<script src="tailwind.js"></script>
+<style>
+  :root{
+    --brand:#165DFF; --brand-weak:#E8F3FF; --ink-1:#1D2129; --ink-2:#4E5969; --ink-3:#86909C;
+    --line:#E5E6EB; --bg:#F7F8FA; --card:#fff;
+    --c-add:#B3E8C0; --c-del:#FFBFBF; --c-mod:#FFD9A8;
+    --risk-high:#F53F3F; --risk-mid:#D25F00; --risk-low:#00875A; --risk-none:#86909C;
+    --review-bg:#E9D5FF; --review-text:#6B21A8; --review-bd:#9333EA;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink-1);background:var(--bg);font-size:13px;}
+  .app{display:flex;flex-direction:row;height:100vh;overflow:hidden;}
+  .sidebar{width:220px;flex:0 0 220px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;transition:width .18s ease;min-height:0;}
+  .sidebar.collapsed{width:64px;flex-basis:64px;}
+  .sb-brand{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);height:56px;white-space:nowrap;overflow:hidden;}
+  .sidebar.collapsed .sb-brand span{display:none;}
+  .logo{width:30px;height:30px;border-radius:6px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:0 0 30px;}
+  .sb-nav{flex:1;overflow:auto;padding:8px;min-height:0;}
+  .sb-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;color:var(--ink-2);cursor:pointer;margin-bottom:2px;white-space:nowrap;overflow:hidden;}
+  .sb-item:hover{background:var(--bg);}
+  .sb-item.active{background:var(--brand-weak);color:var(--brand);font-weight:600;}
+  .sb-sub{padding-left:34px;font-size:13px;color:var(--ink-3);}
+  .sb-sub .ico{opacity:.5;}
+  .sb-sub:hover{background:var(--bg);}
+  .sb-sub.active{background:var(--brand-weak);color:var(--brand);font-weight:600;}
+  .sidebar.collapsed .sb-sub span{display:none;}
+  .sb-item .ico{width:18px;height:18px;flex:0 0 18px;display:flex;align-items:center;justify-content:center;}
+  .sidebar.collapsed .sb-item span{display:none;}
+  .sb-foot{padding:10px 14px;border-top:1px solid var(--line);font-size:11px;color:var(--ink-3);line-height:1.7;white-space:nowrap;overflow:hidden;}
+  .sidebar.collapsed .sb-foot{display:none;}
+  .sb-toggle{position:absolute;top:64px;left:206px;width:22px;height:22px;border-radius:50%;background:#fff;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;color:var(--ink-3);transition:left .18s ease;}
+  .sidebar.collapsed .sb-toggle{left:50px;}
+  .main{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;}
+  .topbar{height:56px;flex:0 0 56px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 18px;}
+  .topbar h1{font-size:16px;margin:0;}
+  .topbar .crumb{font-size:12px;color:var(--ink-3);margin-top:2px;}
+  .top-right{display:flex;align-items:center;gap:12px;}
+  .role-sel{border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-size:12px;color:var(--ink-1);background:#fff;}
+  .content{flex:1;overflow:auto;padding:18px;}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:8px;padding:18px;margin-bottom:16px;max-width:920px;}
+  .panel h2{font-size:14px;margin:0 0 14px;display:flex;align-items:center;gap:8px;}
+  .panel h2 .idx{width:20px;height:20px;border-radius:50%;background:var(--brand);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;}
+  /* 模式单选 */
+  .modes{display:flex;gap:12px;flex-wrap:wrap;}
+  .mode{flex:1;min-width:220px;border:1px solid var(--line);border-radius:6px;padding:12px;cursor:pointer;transition:.12s;}
+  .mode:hover{border-color:var(--brand);}
+  .mode.sel{border-color:var(--brand);background:var(--brand-weak);}
+  .mode.disabled{opacity:.5;cursor:not-allowed;}
+  .mode .mt{font-weight:600;font-size:13px;}
+  .mode .md{font-size:12px;color:var(--ink-3);margin-top:4px;line-height:1.6;}
+  .mode input{margin-right:8px;vertical-align:middle;}
+  .mode-note{font-size:12px;color:var(--risk-mid);margin-top:10px;display:none;}
+  .desc{background:var(--bg);border-radius:6px;padding:10px 12px;font-size:12px;color:var(--ink-2);line-height:1.7;margin-top:12px;}
+  /* 表单 */
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .inp-row{display:flex;gap:8px;align-items:stretch;}
+  .inp-row .inp{flex:1;}
+  .field.full{grid-column:1 / -1;}
+  .field label{font-size:12px;color:var(--ink-2);}
+  .field .req{color:var(--risk-high);}
+  .inp,.sel,.txt{border:1px solid var(--line);border-radius:4px;padding:8px 10px;font-size:13px;color:var(--ink-1);background:#fff;width:100%;}
+  .txt{resize:vertical;min-height:64px;}
+  /* 双区域 */
+  .duo{display:flex;gap:14px;}
+  .zone{flex:1;border:1px dashed var(--line);border-radius:6px;padding:16px;text-align:center;background:#FAFBFC;}
+  .zone .zl{font-weight:600;font-size:13px;margin-bottom:8px;}
+  .zone .pick{display:inline-block;border:1px solid var(--brand);color:var(--brand);background:#fff;border-radius:4px;padding:6px 14px;cursor:pointer;font-size:12px;}
+  .zone .pick:hover{background:var(--brand);color:#fff;}
+  .zone .fn{font-size:12px;color:var(--ink-3);margin-top:8px;}
+  /* 规则配置 */
+  .rules{display:flex;flex-wrap:wrap;gap:10px;}
+  .rule{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:4px;padding:7px 10px;font-size:12px;cursor:pointer;}
+  .rule input{margin:0;}
+  .foot-bar{max-width:920px;display:flex;gap:10px;justify-content:flex-end;}
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink-1);border-radius:4px;padding:8px 16px;font-size:13px;cursor:pointer;}
+  .btn:hover{background:var(--bg);}
+  .btn-primary{background:var(--brand);border-color:var(--brand);color:#fff;}
+  .btn-primary:hover{background:#0E4AD0;}
+  .btn-primary:disabled{opacity:.6;cursor:default;}
+  .toast{position:fixed;left:50%;top:24px;transform:translateX(-50%);background:rgba(29,33,41,.92);color:#fff;padding:9px 16px;border-radius:6px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:200;}
+  .toast.show{opacity:1;}
+.icon-btn{border:1px solid var(--line);background:#fff;border-radius:4px;width:30px;height:30px;cursor:pointer;color:var(--ink-2);font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;flex:0 0 30px;}
+.icon-btn:hover{border-color:var(--brand);color:var(--brand);}
+.topbar{gap:12px;}
+.top-right{margin-left:auto;}
+.sidebar.collapsed .sb-item span,.sidebar.collapsed .sb-sub span{display:none;}
+
+  /* 二级菜单手风琴 */
+  .sb-children{display:none;}
+  .sb-group.open .sb-children{display:block;}
+  .sb-caret{margin-left:auto;font-size:11px;line-height:1;color:var(--ink-3);transition:transform .15s;transform:rotate(0deg);}
+  .sb-group.open > .sb-parent .sb-caret{transform:rotate(90deg);}
+  .sb-children .sb-sub{padding-left:32px;}
+  .sidebar.collapsed .sb-children{display:none!important;}
+  .sidebar.collapsed .sb-caret{display:none;}
+</style>
+</head>
+<body>
+<div class="app">
+    <aside class="sidebar" id="sidebar">
+    <div class="sb-brand"><div class="logo">C</div><span>合同对比助手</span></div>
+          <div class="sb-nav" id="sbNav">
+        <div class="sb-group" data-group="ledger">
+          <div class="sb-item sb-parent" data-nav="ledger"><span class="ico">▤</span><span>合同台账</span><span class="sb-caret">▸</span></div>
+          <div class="sb-children">
+            <div class="sb-sub" data-nav="detail"><span class="ico">›</span><span>合同详情</span></div>
+          </div>
+        </div>
+        <div class="sb-group" data-group="tasks">
+          <div class="sb-item sb-parent" data-nav="tasks"><span class="ico">☰</span><span>比对任务管理</span><span class="sb-caret">▸</span></div>
+          <div class="sb-children">
+            <div class="sb-sub active" data-nav="new"><span class="ico">＋</span><span>新建比对任务</span></div>
+            <div class="sb-sub" data-nav="review"><span class="ico">✎</span><span>对比复核页</span></div>
+          </div>
+        </div>
+        <div class="sb-group" data-group="std">
+          <div class="sb-item sb-parent" data-nav="std"><span class="ico">📘</span><span>标准条款库</span><span class="sb-caret">▸</span></div>
+          <div class="sb-children">
+            <div class="sb-sub" data-nav="clauseDetail"><span class="ico">›</span><span>条款详情&amp;版本对比</span></div>
+          </div>
+        </div>
+        <div class="sb-item" data-nav="risk"><span class="ico">⚠</span><span>风险条款库</span></div>
+        <div class="sb-item" data-nav="eval"><span class="ico">📊</span><span>评测集管理</span></div>
+        <div class="sb-item" data-nav="qc"><span class="ico">✓</span><span>双盲审核工单</span></div>
+        <div class="sb-item" data-nav="rule"><span class="ico">⚙</span><span>风控规则配置</span></div>
+        <div class="sb-group" data-group="archive">
+          <div class="sb-item sb-parent" data-nav="archive"><span class="ico">🗄</span><span>复核报告归档</span><span class="sb-caret">▸</span></div>
+          <div class="sb-children">
+            <div class="sb-sub" data-nav="reportDetail"><span class="ico">›</span><span>复核报告详情</span></div>
+          </div>
+        </div>
+        <div class="sb-item sb-admin-only" data-nav="setting" style="display:none;"><span class="ico">⚷</span><span>系统权限设置</span></div>
+      </div>
+    <div class="sb-foot">一期 规则引擎+差异模型<br>二期 样本相似度+难例挖掘<br>无大模型自动解读</div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+        <button class="icon-btn" id="sbToggle" title="收起/展开侧边栏">☰</button>
+        <button class="icon-btn" id="backBtn" title="返回上一页" onclick="history.back()">‹</button>
+      <div>
+        <h1>新建比对任务</h1>
+        <div class="crumb">合同对比助手 / 法务工作台 / 新建比对</div>
+      </div>
+      <div class="top-right">
+        <span class="lock-note" id="permHint" style="font-size:12px;color:var(--ink-3);"></span>
+        <label style="font-size:12px;color:var(--ink-3);">角色</label>
+        <select class="role-sel" id="roleSel">
+          <option value="procurement">采购专员</option>
+          <option value="legal" selected>法务审核员</option>
+          <option value="admin">管理员</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- 1. 比对模式 -->
+      <div class="panel">
+        <h2><span class="idx">1</span>比对模式</h2>
+        <div class="modes" id="modes">
+          <label class="mode" data-mode="std-vs-sup">
+            <input type="radio" name="mode" value="std-vs-sup" checked>
+            <span class="mt">标准合同 VS 供应商合同</span>
+            <div class="md">比对企业标准采购合同模板与供应商回传的待审合同，识别条款偏离与缺失。</div>
+          </label>
+          <label class="mode" data-mode="ext-vs-std">
+            <input type="radio" name="mode" value="ext-vs-std">
+            <span class="mt">外部合同 VS 外部合同</span>
+            <div class="md">将两份外部合同（如甲方模板与供应商回传）做对照，核查条款偏离与风险点。</div>
+          </label>
+          <label class="mode" data-mode="ver-compare">
+            <input type="radio" name="mode" value="ver-compare">
+            <span class="mt">历史版本对比</span>
+            <div class="md">对同一合同的历史版本与当前版本做差异比对，追溯条款演变。</div>
+          </label>
+        </div>
+        <div class="mode-note" id="modeNote">采购专员仅可使用「标准合同 VS 供应商合同」模式，其余模式已锁定。</div>
+        <div class="desc" id="modeDesc"></div>
+      </div>
+
+      <!-- 2. 业务表单 -->
+      <div class="panel">
+        <h2><span class="idx">2</span>业务信息</h2>
+        <div class="form-grid">
+          <div class="field">
+            <label>任务名称 <span class="req">*</span></label>
+            <input class="inp" id="fName" placeholder="如：华东精密年度采购合同比对">
+          </div>
+          <div class="field">
+            <label>关联采购项目 / 合同编号</label>
+            <div class="inp-row">
+              <input class="inp" id="fNo" placeholder="如：PRJ-2026-0831">
+              <button class="btn" type="button" onclick="searchOA()">搜索OA</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>供应商名称</label>
+            <input class="inp" id="fSup" placeholder="如：华东精密制造">
+          </div>
+          <div class="field">
+            <label>期望完成时间</label>
+            <input class="inp" id="fDue" type="date">
+          </div>
+          <div class="field full">
+            <label>备注</label>
+            <textarea class="txt" id="fNote" placeholder="补充比对背景或重点关注条款"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 基准 / 待对比区域 -->
+      <div class="panel">
+        <h2><span class="idx">3</span>基准 / 待对比文档</h2>
+        <div class="duo">
+          <div class="zone">
+            <div class="zl" id="baseLabel">基准：标准合同模板</div>
+            <span class="pick" onclick="pickFile('base')">选择文件</span>
+            <div class="fn" id="baseFile">未选择文件</div>
+          </div>
+          <div class="zone">
+            <div class="zl" id="targetLabel">待对比：供应商待审合同</div>
+            <span class="pick" onclick="pickFile('target')">选择文件</span>
+            <div class="fn" id="targetFile">未选择文件</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. 规则配置 -->
+      <div class="panel">
+        <h2><span class="idx">4</span>规则配置</h2>
+        <div class="rules" id="rules">
+          <label class="rule"><input type="checkbox" checked value="R-Pay">价格与支付</label>
+          <label class="rule"><input type="checkbox" checked value="R-Q">质量保证</label>
+          <label class="rule"><input type="checkbox" checked value="R-Del">交付与物流</label>
+          <label class="rule"><input type="checkbox" checked value="R-Sec">保密义务</label>
+          <label class="rule"><input type="checkbox" checked value="R-Pen">违约责任</label>
+          <label class="rule"><input type="checkbox" checked value="R-IP">知识产权</label>
+        </div>
+        <div class="field" style="margin-top:14px;max-width:240px;">
+          <label>风险判定阈值</label>
+          <select class="sel" id="fThresh">
+            <option value="loose">宽松</option>
+            <option value="std" selected>标准</option>
+            <option value="strict">严格</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="foot-bar">
+        <button class="btn" onclick="window.location.href='page3.html?role='+encodeURIComponent(state.role)">取消</button>
+        <button class="btn-primary btn" id="startBtn" onclick="startDetect()">开始差异检测</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const MODE_DESC={
+  'std-vs-sup':'基准取【企业标准采购合同模板】，待对比取【供应商回传的待审合同】。系统逐条比对条款，输出新增 / 删除 / 修改 / 一致四类差异，并初判风险等级。',
+  'ext-vs-std':'基准取【外部合同 A】，待对比取【外部合同 B】。重点核查两份外部合同之间的条款偏离与风险点。',
+  'ver-compare':'基准取【合同历史版本 A】，待对比取【当前版本 B】。追溯条款演变，识别版本间实质性变更。'
+};
+const BASE_LABEL={ 'std-vs-sup':'基准：标准合同模板', 'ext-vs-std':'基准：外部合同 A', 'ver-compare':'基准：历史版本 A' };
+const TARGET_LABEL={ 'std-vs-sup':'待对比：供应商待审合同', 'ext-vs-std':'待对比：外部合同 B', 'ver-compare':'待对比：当前版本 B' };
+const state={ role:'legal', mode:'std-vs-sup', base:false, target:false };
+
+function renderMode(){
+  document.querySelectorAll('.mode').forEach(m=>{
+    const md=m.dataset.mode;
+    const input=m.querySelector('input');
+    if(state.role==='procurement' && md!=='std-vs-sup'){
+      m.classList.add('disabled'); input.disabled=true;
+    }else{
+      m.classList.remove('disabled'); input.disabled=false;
+    }
+    m.classList.toggle('sel', md===state.mode);
+    input.checked = (md===state.mode);
+  });
+  document.getElementById('modeDesc').textContent = MODE_DESC[state.mode];
+  document.getElementById('baseLabel').textContent = BASE_LABEL[state.mode];
+  document.getElementById('targetLabel').textContent = TARGET_LABEL[state.mode];
+  document.getElementById('modeNote').style.display = (state.role==='procurement')?'block':'none';
+}
+function applyPermHint(){
+  const map={procurement:'采购专员：仅「标准合同 VS 供应商合同」模式可用',legal:'法务审核员：全部比对模式',admin:'管理员：全部比对模式 + 管理权限'};
+  document.getElementById('permHint').textContent=map[state.role];
+  document.getElementById('roleSel').value=state.role;
+  document.querySelectorAll('.sb-admin-only').forEach(el=>{ el.style.display = state.role==='admin'?'flex':'none'; });
+}
+function pickFile(which){
+  if(which==='base'){ state.base=true; document.getElementById('baseFile').textContent='已选择：document_base.pdf'; }
+  else { state.target=true; document.getElementById('targetFile').textContent='已选择：document_target.pdf'; }
+  toast('文件已载入（演示）');
+}
+function startDetect(){
+  const name=document.getElementById('fName').value.trim();
+  if(!name){ toast('请填写任务名称'); return; }
+  if(!state.base || !state.target){ toast('请先选择基准与待对比文档'); return; }
+  const btn=document.getElementById('startBtn');
+  btn.disabled=true; btn.textContent='解析中…';
+  toast('正在解析并初判差异（演示，无大模型）');
+  setTimeout(()=>{ window.location.href='page5.html?role='+encodeURIComponent(state.role); }, 1300);
+}
+let toastTimer=null;
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),1800);
+}
+function searchOA(){
+  const inp=document.getElementById('fNo');
+  const kw=inp.value.trim();
+  if(!kw){
+    toast('正在从 OA 系统检索全部关联合同（演示）…');
+    setTimeout(()=>{ inp.value='（OA:HT-OA-2026-0901）'; toast('OA 检索完成，已带入参考合同编号'); }, 700);
+  }else{
+    toast('正在从 OA 系统检索「'+kw+'」关联合同（演示）…');
+    setTimeout(()=>{ inp.value = kw+'（OA:HT-OA-2026-0901）'; toast('OA 检索完成，已带入参考合同编号'); }, 700);
+  }
+}
+
+const OA_STD_CONTRACTS={
+  '采购主协议':{name:'标准采购主协议模板', code:'OA-STD-001'},
+  '设备采购':  {name:'标准设备采购合同模板', code:'OA-STD-002'},
+  '框架协议':  {name:'标准框架协议模板', code:'OA-STD-003'},
+  '供应合同':  {name:'标准供应合同模板', code:'OA-STD-004'},
+  '服务合同':  {name:'标准服务合同模板', code:'OA-STD-005'}
+};
+function prefillFromLedger(){
+  const p=new URLSearchParams(location.search);
+  // 单合同「发起比对」流程：src* 来自合同台账
+  const srcId=p.get('srcId'), srcName=p.get('srcName'), srcCode=p.get('srcCode'), srcType=p.get('srcType');
+  if(srcId){
+    // 待对比：供应商待审合同 = 发起比对的合同
+    state.target=true;
+    document.getElementById('targetFile').textContent='已带入：'+(srcName||srcId)+(srcCode?' · '+srcCode:'');
+    // 自动识别合同类型，从 OA 调出对应标准合同模板填入基准
+    const std=OA_STD_CONTRACTS[srcType] || OA_STD_CONTRACTS['采购主协议'];
+    state.base=true;
+    document.getElementById('baseFile').textContent='已带入（OA标准）：'+std.name+' · '+std.code;
+    toast('已根据合同类型「'+(srcType||'未知')+'」从 OA 自动匹配标准模板「'+std.name+'」');
+    return;
+  }
+  // 批量比对流程：c1/cn1/cc1 → 基准，c2/cn2/cc2 → 待对比
+  const c1=p.get('c1'), cn1=p.get('cn1'), cc1=p.get('cc1');
+  const c2=p.get('c2'), cn2=p.get('cn2'), cc2=p.get('cc2');
+  if(c1){
+    state.base=true;
+    document.getElementById('baseFile').textContent='已带入：'+(cn1||c1)+(cc1?' · '+cc1:'');
+  }
+  if(c2){
+    state.target=true;
+    document.getElementById('targetFile').textContent='已带入：'+(cn2||c2)+(cc2?' · '+cc2:'');
+  }
+}
+const NAV = {
+  ledger:{url:'page1.html'},
+  tasks:{url:'page3.html'},
+  new:{page:true},
+  std:{url:'page6.html'},
+  risk:{url:'page9.html'},
+  eval:{url:'page10.html'},
+  qc:{url:'page11.html'},
+  rule:{url:'page12.html'},
+  archive:{url:'page13.html'},
+  detail:{url:'page2.html'},
+  review:{url:'page5.html'},
+  clauseDetail:{url:'page7.html'},
+  reportDetail:{url:'page8.html'},
+
+  setting:{}
+};
+function go(url){ window.location.href = url + (url.indexOf('?')>-1?'&':'?') + 'role=' + state.role; }
+
+function bind(){
+  document.getElementById('roleSel').addEventListener('change',e=>{
+    state.role=e.target.value;
+    if(state.role==='procurement' && state.mode!=='std-vs-sup'){ state.mode='std-vs-sup'; }
+    applyPermHint(); renderMode();
+  });
+  document.querySelectorAll('.mode').forEach(m=>{
+    m.addEventListener('click',e=>{
+      if(m.classList.contains('disabled')){ e.preventDefault(); return; }
+      state.mode=m.dataset.mode; renderMode();
+    });
+  });
+  document.getElementById('sbToggle').addEventListener('click',()=>{ document.getElementById('sidebar').classList.toggle('collapsed'); });
+  document.querySelectorAll('.sb-item[data-nav], .sb-sub[data-nav]').forEach(it=>{
+    it.addEventListener('click',()=>{
+      const nav=it.dataset.nav; const cfg=NAV[nav];
+      if(cfg&&cfg.page) return;
+      if(cfg&&cfg.url){ go(cfg.url); return; }
+      toast('「'+(it.querySelector('span:last-child')?it.querySelector('span:last-child').textContent:'')+'」模块暂未开放');
+    });
+  });
+}
+const _ur=new URLSearchParams(location.search).get('role');
+if(_ur && ['procurement','legal','admin'].includes(_ur)){ state.role=_ur; }
+applyPermHint();
+renderMode();
+prefillFromLedger();
+bind();
+</script>
+
+<script>
+(function(){
+  function toggleGroup(p){
+    var g=p.closest('.sb-group');
+    if(!g) return;
+    var willOpen=!g.classList.contains('open');
+    document.querySelectorAll('#sbNav .sb-group').forEach(function(x){x.classList.remove('open');});
+    if(willOpen) g.classList.add('open');
+  }
+  document.querySelectorAll('#sbNav .sb-group > .sb-parent').forEach(function(p){
+    p.addEventListener('click', function(){ toggleGroup(p); });
+  });
+  // 初始：仅展开含 active 项的组（其余折叠，满足手风琴默认折叠）
+  var act=document.querySelector('#sbNav .sb-item.active, #sbNav .sb-sub.active');
+  if(act){ var g=act.closest('.sb-group'); if(g) g.classList.add('open'); }
+})();
+</script>
+</body>
+</html>

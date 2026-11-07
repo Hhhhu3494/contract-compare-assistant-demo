@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>标准条款库 · 合同对比助手</title>
+<script src="tailwind.js"></script>
+<style>
+  :root{
+    --brand:#165DFF; --brand-weak:#E8F3FF; --ink-1:#1D2129; --ink-2:#4E5969; --ink-3:#86909C;
+    --line:#E5E6EB; --bg:#F7F8FA; --card:#fff;
+    --c-add:#B3E8C0; --c-del:#FFBFBF; --c-mod:#FFD9A8;
+    --risk-high:#F53F3F; --risk-mid:#D25F00; --risk-low:#00875A; --risk-none:#86909C;
+    --review-bg:#E9D5FF; --review-text:#6B21A8; --review-bd:#9333EA;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink-1);background:var(--bg);font-size:13px;}
+  .app{display:flex;flex-direction:row;height:100vh;overflow:hidden;}
+  /* 侧边导航（全站统一 9 项） */
+  .sidebar{width:220px;flex:0 0 220px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;transition:width .18s ease;min-height:0;}
+  .sidebar.collapsed{width:64px;flex-basis:64px;}
+  .sb-brand{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);height:56px;white-space:nowrap;overflow:hidden;}
+  .sidebar.collapsed .sb-brand span{display:none;}
+  .logo{width:30px;height:30px;border-radius:6px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:0 0 30px;}
+  .sb-nav{flex:1;overflow:auto;padding:8px;min-height:0;}
+  .sb-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;color:var(--ink-2);cursor:pointer;margin-bottom:2px;white-space:nowrap;overflow:hidden;}
+  .sb-item:hover{background:var(--bg);}
+  .sb-item.active{background:var(--brand-weak);color:var(--brand);font-weight:600;}
+  .sb-sub{padding-left:34px;font-size:13px;color:var(--ink-3);}
+  .sb-sub .ico{opacity:.5;}
+  .sb-sub:hover{background:var(--bg);}
+  .sb-sub.active{background:var(--brand-weak);color:var(--brand);font-weight:600;}
+  .sidebar.collapsed .sb-sub span{display:none;}
+  .code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--ink-2);}
+  .sb-item .ico{width:18px;height:18px;flex:0 0 18px;display:flex;align-items:center;justify-content:center;}
+  .sidebar.collapsed .sb-item span{display:none;}
+  .sb-foot{padding:10px 14px;border-top:1px solid var(--line);font-size:11px;color:var(--ink-3);line-height:1.7;white-space:nowrap;overflow:hidden;}
+  .sidebar.collapsed .sb-foot{display:none;}
+  .sb-toggle{position:absolute;top:64px;left:206px;width:22px;height:22px;border-radius:50%;background:#fff;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;color:var(--ink-3);transition:left .18s ease;}
+  .sidebar.collapsed .sb-toggle{left:50px;}
+  /* 主区 */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;}
+  .topbar{height:56px;flex:0 0 56px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 18px;}
+  .topbar h1{font-size:16px;margin:0;}
+  .topbar .crumb{font-size:12px;color:var(--ink-3);margin-top:2px;}
+  .top-right{display:flex;align-items:center;gap:12px;}
+  .role-sel{border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-size:12px;color:var(--ink-1);background:#fff;}
+  .content{flex:1;overflow:auto;padding:10px 18px 18px;}
+  .lock-note{font-size:12px;color:var(--ink-3);}
+  /* 筛选条 / 快捷操作 */
+  .filterbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#fff;border:1px solid var(--line);border-radius:6px;padding:12px;margin-bottom:14px;}
+  .f-input,.f-select{border:1px solid var(--line);border-radius:4px;padding:7px 10px;font-size:13px;color:var(--ink-1);background:#fff;}
+  .f-input{min-width:240px;}
+  .chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2);cursor:pointer;margin-left:2px;}
+  .spacer{flex:1;}
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink-1);border-radius:4px;padding:5px 10px;font-size:12px;cursor:pointer;}
+  .btn:hover{background:var(--bg);}
+  .btn-primary{background:var(--brand);border-color:var(--brand);color:#fff;}
+  .btn-primary:hover{background:#0E4AD0;}
+  .btn-sm{padding:3px 8px;font-size:12px;}
+  /* 禁用态：未选中时批量发起比对置灰（覆盖 btn-primary 蓝底） */
+  .btn:disabled,.btn:disabled:hover{background:#F2F3F5;border-color:var(--line);color:var(--ink-3);opacity:.7;cursor:not-allowed;}
+  /* 区块标题 */
+  .sec-title{font-size:14px;font-weight:600;color:var(--ink-1);margin:14px 0 8px;display:flex;align-items:center;gap:8px;}
+  /* 首个板块标题紧贴内容区顶部：消除顶栏到「高频常用条款」之间的大块留白 */
+  .content > .ro-banner + .sec-title{margin-top:2px;}
+  .sec-title .line{width:3px;height:14px;background:var(--brand);border-radius:2px;}
+  /* 卡片（板块一流式换行使用） */
+  .c-card{flex:0 0 240px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:8px;position:relative;}
+  .c-card.sel{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-weak);}
+  .c-card .ttl{font-weight:600;font-size:13px;padding-right:22px;}
+  .c-card .meta{font-size:12px;color:var(--ink-3);}
+  .c-card .ck{position:absolute;top:12px;right:12px;}
+  .c-card .op{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;}
+  .tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;line-height:1.5;}
+  .t-cat{background:#F2F3F5;color:var(--ink-2);}
+  .t-review{background:var(--review-bg);color:var(--review-text);border:1px solid var(--review-bd);}
+  /* 待重点复核标签：只补交互反馈（可点 / 悬停 / 键盘焦点），颜色字号边框内距一律不变 */
+  .tag-link{cursor:pointer;}
+  .tag-link:hover{box-shadow:0 0 0 2px rgba(147,51,234,.18);}
+  .tag-link:focus-visible{outline:2px solid var(--brand);outline-offset:2px;}
+  /* 表格 */
+  .card{background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  table{width:100%;border-collapse:collapse;}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:middle;}
+  th{background:#FAFBFC;color:var(--ink-3);font-weight:600;font-size:12px;}
+  tbody tr{cursor:default;transition:background .12s;}
+  tbody tr:hover{background:var(--brand-weak);}
+  th[data-sort]{cursor:pointer;user-select:none;}
+  th[data-sort]:hover{color:var(--brand);}
+  .sort-ico{font-size:10px;margin-left:2px;color:var(--brand);}
+  .col-sel{width:40px;text-align:center;}
+  .op{display:flex;gap:6px;flex-wrap:wrap;}
+  .empty{padding:32px;text-align:center;color:var(--ink-3);}
+  /* 页面标题区右上角：最近浏览折叠面板（默认收起，仅占一个按钮） */
+  .recent-wrap{position:relative;}
+  .recent-btn{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:4px;padding:5px 10px;font-size:12px;color:var(--ink-2);cursor:pointer;height:30px;white-space:nowrap;}
+  .recent-btn:hover,.recent-wrap.open .recent-btn{border-color:var(--brand);color:var(--brand);}
+  .recent-btn .caret{font-size:10px;transition:transform .15s;}
+  .recent-wrap.open .recent-btn .caret{transform:rotate(180deg);}
+  .recent-panel{display:none;position:absolute;top:36px;right:0;width:300px;max-height:360px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:6px;box-shadow:0 6px 20px rgba(29,33,41,.14);z-index:150;}
+  .recent-wrap.open .recent-panel{display:block;}
+  .recent-hd{padding:10px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--ink-3);display:flex;justify-content:space-between;}
+  .recent-item{width:100%;text-align:left;border:0;border-bottom:1px solid #F2F3F5;background:#fff;padding:7px 12px;min-height:40px;display:flex;flex-direction:column;gap:2px;cursor:pointer;}
+  .recent-item:last-child{border-bottom:0;}
+  .recent-item:hover{background:var(--brand-weak);}
+  .recent-item .rt{font-size:13px;color:var(--ink-1);font-weight:600;}
+  .recent-item .rm{font-size:11px;color:var(--ink-3);}
+  .recent-empty{padding:20px;text-align:center;color:var(--ink-3);font-size:12px;}
+  /* 板块一：分类 Tab + 流式卡片（自动换行） */
+  .tabs{display:inline-flex;gap:4px;background:#F2F3F5;border-radius:4px;padding:3px;}
+  .tab{border:0;background:transparent;color:var(--ink-2);border-radius:4px;padding:5px 12px;font-size:12px;cursor:pointer;min-height:28px;}
+  .tab:hover{color:var(--brand);}
+  .tab.active{background:#fff;color:var(--brand);font-weight:600;box-shadow:0 1px 3px rgba(29,33,41,.10);}
+  .flow-row{display:flex;flex-wrap:wrap;gap:12px;padding:2px 2px 6px;align-items:stretch;}
+  .flow-row .c-card{flex:0 0 240px;}
+  .flow-row .empty{width:100%;}
+  .subbar{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:12px;color:var(--ink-3);}
+  .subbar .sel-info{font-size:12px;color:var(--brand);font-weight:600;}
+  /* 板块一标题行：标题 → Tab → 批量控件成组靠左（无 flex:1 的 spacer 推向右侧） */
+  .sec-title.hf-head{flex-wrap:wrap;}
+  .title-tools{display:flex;align-items:center;gap:8px;font-weight:400;color:var(--ink-2);}
+  .title-tools .btn{font-weight:400;}
+  /* 分页 */
+  .pager{display:none;align-items:center;gap:8px;padding:12px 14px;border-top:1px solid var(--line);flex-wrap:wrap;}
+  .pager.show{display:flex;}
+  .pg-info{font-size:12px;color:var(--ink-3);margin-right:8px;}
+  .pg-btn{border:1px solid var(--line);background:#fff;border-radius:4px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--ink-2);}
+  .pg-btn:hover:not(:disabled){background:var(--bg);border-color:var(--brand);color:var(--brand);}
+  .pg-btn.active{background:var(--brand);border-color:var(--brand);color:#fff;}
+  .pg-btn:disabled{opacity:.45;cursor:not-allowed;}
+  /* 批量选择栏（参考复核报告归档页：未选中时批量发起比对置灰，选中后显示已选中X份+取消选择） */
+  .sel-info{font-size:12px;color:var(--brand);font-weight:600;}
+  /* 权限显隐 */
+  .role-procurement .legal-only{display:none;}
+  .role-procurement .mgr-only{display:none;}
+  .role-legal .mgr-only{display:none;}
+  /* 采购只读横幅（仅采购专员显示） */
+  .ro-banner{display:none;align-items:center;gap:8px;background:#FFF7E8;border:1px solid #FFD9A8;border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:13px;color:#D25F00;}
+  .role-procurement .ro-banner{display:flex;}
+  /* 弹窗 / toast */
+  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:100;}
+  .modal-mask.show{display:flex;}
+  .modal-box{position:relative;}
+  .modal{background:#fff;border-radius:8px;width:min(480px,92vw);max-height:86vh;overflow:auto;padding:22px;}
+  .modal h3{margin:0 0 14px;font-size:16px;}
+  .modal-close{position:absolute;top:-14px;right:-14px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border:none;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.18);font-size:20px;line-height:1;color:var(--ink-3);cursor:pointer;border-radius:6px;z-index:2;}
+  .modal-close:hover{background:#F2F3F5;color:var(--ink-1);}
+  .toast{position:fixed;left:50%;top:24px;transform:translateX(-50%);background:rgba(29,33,41,.92);color:#fff;padding:9px 16px;border-radius:6px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:200;}
+  .toast.show{opacity:1;}
+.icon-btn{border:1px solid var(--line);background:#fff;border-radius:4px;width:30px;height:30px;cursor:pointer;color:var(--ink-2);font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;flex:0 0 30px;}
+.icon-btn:hover{border-color:var(--brand);color:var(--brand);}
+.topbar{gap:12px;}
+.top-right{margin-left:auto;}
+.sidebar.collapsed .sb-item span,.sidebar.collapsed .sb-sub span{display:none;}
+
+  /* 二级菜单手风琴 */
+  .sb-children{display:none;}
+  .sb-group.open .sb-children{display:block;}
+  .sb-caret{margin-left:auto;font-size:11px;line-height:1;color:var(--ink-3);transition:transform .15s;transform:rotate(0deg);}
+  .sb-group.open > .sb-parent .sb-caret{transform:rotate(90deg);}
+  .sb-children .sb-sub{padding-left:32px;}
+  .sidebar.collapsed .sb-children{display:none!important;}
+  .sidebar.collapsed .sb-caret{display:none;}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 侧边导航（全站统一） -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-brand"><div class="logo">C</div><span>合同对比助手</span></div>
+          <div class="sb-nav" id="sbNav">
+        <div class="sb-group" data-group="ledger">
+          <div class="sb-item sb-parent" data-nav="ledger"><span class="ico">▤</span><span>合同台账</span><span class="sb-caret">▸</span></div>
+          <div class="sb-children">
+            <div class="sb-sub" data-nav="detail"><span class="ico">›</span><span>合同详情</span></div>
+          </div>
+        </div>
+        <div class="sb-group" data-group="tasks">
+          <div class="sb-item sb-parent" data-nav="tasks"><span class="ico">☰</span><span>比对任务管理</span><span class="sb-caret">▸</span></div>
+          <div class="sb-children">
+            <div class="sb-sub" data-nav="new"><span class="ico">＋</span><span>新建比对任务</span></div>
+            <div class="sb-sub" data-nav="review"><span class="ico">✎</span><span>对比复核页</span></div>
+          </div>
+        </div>
+        <div class="sb-group" data-group="std">
+          <div class="sb-item sb-parent active" data-nav="std"><span class="ico">📘</span><span>标准条款库</span><span class="sb-caret">▸</span></div>
+          <div class="sb-children">
+            <div class="sb-sub" data-nav="clauseDetail"><span class="ico">›</span><span>条款详情&amp;版本对比</span></div>
+          </div>
+        </div>
+        <div class="sb-item" data-nav="risk"><span class="ico">⚠</span><span>风险条款库</span></div>
+        <div class="sb-item" data-nav="eval"><span class="ico">📊</span><span>评测集管理</span></div>
+        <div class="sb-item" data-nav="qc"><span class="ico">✓</span><span>双盲审核工单</span></div>
+        <div class="sb-item" data-nav="rule"><span class="ico">⚙</span><span>风控规则配置</span></div>
+        <div class="sb-group" data-group="archive">
+          <div class="sb-item sb-parent" data-nav="archive"><span class="ico">🗄</span><span>复核报告归档</span><span class="sb-caret">▸</span></div>
+          <div class="sb-children">
+            <div class="sb-sub" data-nav="reportDetail"><span class="ico">›</span><span>复核报告详情</span></div>
+          </div>
+        </div>
+        <div class="sb-item sb-admin-only" data-nav="setting" style="display:none;"><span class="ico">⚷</span><span>系统权限设置</span></div>
+      </div>
+    <div class="sb-foot">一期 规则引擎+差异模型<br>二期 样本相似度+难例挖掘<br>无大模型自动解读</div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+        <button class="icon-btn" id="sbToggle" title="收起/展开侧边栏">☰</button>
+        <button class="icon-btn" id="backBtn" title="返回上一页" onclick="history.back()">‹</button>
+      <div>
+        <h1>标准条款库</h1>
+        <div class="crumb">合同对比助手 / 标准条款库（比对基准库）</div>
+      </div>
+      <div class="top-right">
+        <!-- 最近浏览：默认收起，展开后最多 8 条，点击条目跳转条款详情 -->
+        <div class="recent-wrap" id="recentWrap">
+          <button class="recent-btn" id="recentBtn" aria-expanded="false" aria-controls="recentPanel" title="最近浏览条款（默认收起）">🕘 最近浏览 <span class="caret">▾</span></button>
+          <div class="recent-panel" id="recentPanel" role="region" aria-label="最近浏览条款">
+            <div class="recent-hd"><span>最近访问条款</span><span id="recentCount"></span></div>
+            <div id="recentList"></div>
+          </div>
+        </div>
+        <span class="lock-note" id="permHint"></span>
+        <label class="lock-note">角色</label>
+        <select class="role-sel" id="roleSel">
+          <option value="procurement">采购专员</option>
+          <option value="legal" selected>法务审核员</option>
+          <option value="admin">管理员</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- 只读提示（采购专员视角） -->
+      <div class="ro-banner">🔒 当前为采购专员视角：标准条款库仅可浏览，新增 / 导入 / 发起比对 / 批量发起比对等操作已禁用。</div>
+
+      <!-- 板块一：高频常用条款（标题 → Tab → 批量控件，同一行整体靠左） -->
+      <div class="sec-title hf-head"><span class="line"></span>高频常用条款
+        <div class="tabs" id="hfTabs" role="tablist" aria-label="高频条款分类">
+          <button class="tab active" data-cat="法务合规类" title="对应条款类别：法务合规类" aria-selected="true" onclick="switchHfTab('法务合规类')">不合规类</button>
+          <button class="tab" data-cat="交付类" aria-selected="false" onclick="switchHfTab('交付类')">交付类</button>
+          <button class="tab" data-cat="财务类" aria-selected="false" onclick="switchHfTab('财务类')">财务类</button>
+        </div>
+        <div class="title-tools">
+          <span class="sel-info" id="cardSelInfo" style="display:none;"></span>
+          <button class="btn btn-primary" id="cardBatchBtn" disabled onclick="doBatchCompare('card')">批量发起比对</button>
+          <button class="btn" id="cardClearBtn" style="display:none;" onclick="clearSel('card')">取消选择</button>
+        </div>
+      </div>
+      <div class="subbar"><span id="hfCatInfo"></span></div>
+      <div class="flow-row" id="cardRow"></div>
+
+      <!-- 板块二：全部标准条款（表格 + 筛选 + 时间排序 + 批量勾选比对） -->
+      <div class="sec-title"><span class="line"></span>全部标准条款</div>
+      <div class="filterbar">
+        <input class="f-input" id="kw" placeholder="搜索条款标题 / 编号">
+        <select class="f-select" id="fCat">
+          <option value="">全部条款类别</option>
+          <option value="采购类">采购类</option>
+          <option value="供应类">供应类</option>
+          <option value="财务类">财务类</option>
+          <option value="交付类">交付类</option>
+          <option value="法务合规类">法务合规类</option>
+        </select>
+        <select class="f-select" id="fVersion">
+          <option value="">全部版本</option>
+          <option value="V4">V4.x</option>
+          <option value="V3">V3.x</option>
+          <option value="V2">V2.x</option>
+          <option value="V1">V1.x</option>
+          <option value="V0">V0.x</option>
+        </select>
+        <select class="f-select" id="fType">
+          <option value="">全部基准类型</option>
+          <option value="标准模板">标准模板</option>
+          <option value="历史归档">历史归档</option>
+        </select>
+        <label class="chk"><input type="checkbox" id="fReview"> 仅看待重点复核</label>
+        <div class="spacer"></div>
+        <!-- 本板块批量操作控件：与筛选条件同排，靠右 -->
+        <span class="sel-info" id="tableSelInfo" style="display:none;"></span>
+        <button class="btn btn-primary" id="tableBatchBtn" disabled onclick="doBatchCompare('table')">批量发起比对</button>
+        <button class="btn" id="tableClearBtn" style="display:none;" onclick="clearSel('table')">取消选择</button>
+        <button class="btn mgr-only" id="addBtn">＋ 新增条款</button>
+        <button class="btn mgr-only" id="importBtn">导入</button>
+      </div>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-sel"><input type="checkbox" id="checkAll" title="全选本页"></th>
+              <th data-sort="id">条款编号</th><th data-sort="title">标题</th><th data-sort="cat">类目</th><th data-sort="type">基准类型</th><th data-sort="version">版本</th>
+              <th data-sort="review">待重点复核</th><th data-sort="used">使用次数</th><th data-sort="time">更新时间</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div class="empty" id="emptyTip" style="display:none;">无匹配条款</div>
+        <div class="pager" id="pager"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗 / toast -->
+<div class="modal-mask" id="infoMask">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('infoMask')" aria-label="关闭">×</button>
+    <div class="modal" id="infoBody" style="width:min(420px,92vw);"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const NAV = {
+  ledger:{url:'page1.html'},
+  tasks:{url:'page3.html'},
+  new:{url:'page4.html'},
+  std:{page:true},
+  risk:{url:'page9.html'}, eval:{url:'page10.html'}, qc:{url:'page11.html'}, rule:{url:'page12.html'}, archive:{url:'page13.html'},
+  detail:{url:'page2.html'},
+  review:{url:'page5.html'},
+  clauseDetail:{url:'page7.html'},
+  reportDetail:{url:'page8.html'},
+
+  setting:{}
+};
+const ROLE_LABEL = {procurement:'采购专员（仅只读浏览）', legal:'法务审核员（可发起比对 / 查看）', admin:'管理员 / 法务负责人（含新增导入 / 批量管理）'};
+
+const CLAUSES = [
+  {id:'CL-001', title:'付款账期与结算条款', cat:'财务类', type:'标准模板', version:'V3.2', review:2, used:128, time:'2026-11-01', risk:2, note:'账期≤60日，逾期违约金按日万分之五'},
+  {id:'CL-002', title:'质量标准与验收条款', cat:'交付类', type:'标准模板', version:'V2.1', review:0, used:96, time:'2026-10-28', risk:0, note:'到货 7 日内完成验收，质保期≥12 月'},
+  {id:'CL-003', title:'违约责任与赔偿上限', cat:'法务合规类', type:'标准模板', version:'V4.0', review:3, used:152, time:'2026-10-25', risk:1, note:'赔偿上限不超过合同总额 20%'},
+  {id:'CL-004', title:'采购订单数量浮动', cat:'采购类', type:'标准模板', version:'V1.5', review:0, used:74, time:'2026-10-22', risk:1, note:'±10% 数量浮动免违约责任'},
+  {id:'CL-005', title:'供应商准入资质', cat:'供应类', type:'标准模板', version:'V2.0', review:1, used:88, time:'2026-10-20', risk:1, note:'需具备 ISO9001 及安全生产许可'},
+  {id:'CL-006', title:'保密与竞业限制', cat:'法务合规类', type:'标准模板', version:'V3.1', review:0, used:61, time:'2026-10-18', risk:0, note:'保密期 3 年，竞业 1 年'},
+  {id:'CL-007', title:'价格调整机制', cat:'财务类', type:'历史归档', version:'V0.9', review:0, used:33, time:'2026-09-30', risk:0, note:'原材料波动超 5% 可触发调价（旧版）'},
+  {id:'CL-008', title:'交付地点与运费承担', cat:'交付类', type:'标准模板', version:'V1.8', review:1, used:109, time:'2026-09-26', risk:1, note:'供方承担至买方仓库运费'},
+  {id:'CL-009', title:'知识产权归属', cat:'法务合规类', type:'标准模板', version:'V2.2', review:0, used:45, time:'2026-09-20', risk:1, note:'定制化成果归采购方所有'},
+  {id:'CL-010', title:'不可抗力与合同解除', cat:'法务合规类', type:'历史归档', version:'V0.7', review:0, used:21, time:'2026-09-12', risk:1, note:'旧版解除条件偏宽松'}
+];
+
+const PAGE_SIZE = 5;
+const MAX_RECENT = 8;
+/* 高频常用条款 Tab：界面用词「不合规类」对应数据类别「法务合规类」 */
+const HF_TABS = [
+  {cat:'法务合规类', label:'不合规类'},
+  {cat:'交付类', label:'交付类'},
+  {cat:'财务类', label:'财务类'}
+];
+/* 两个板块各自独立的选中集合，互不共享、互不干扰 */
+const state = { role:'legal', cat:'', kw:'', version:'', type:'', onlyReview:false,
+  hfCat:'法务合规类', cardSel:new Set(), tableSel:new Set(),
+  sortKey:'time', sortDir:'desc', page:1 };
+
+function go(url){ window.location.href = url + (url.indexOf('?')>-1?'&':'?') + 'role=' + state.role; }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2000); }
+function showModal(id){ document.getElementById(id).classList.add('show'); }
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+function filtered(){
+  const kw=state.kw.trim().toLowerCase();
+  return CLAUSES.filter(c=>{
+    if(state.cat && c.cat!==state.cat) return false;
+    if(state.version && !c.version.startsWith(state.version)) return false;
+    if(state.type && c.type!==state.type) return false;
+    if(state.onlyReview && c.review===0) return false;
+    if(kw && !(c.title.toLowerCase().includes(kw)||c.id.toLowerCase().includes(kw))) return false;
+    return true;
+  });
+}
+
+/* 排序后的列表（仅表格使用） */
+function sortedList(){
+  const list=filtered().slice();
+  const k=state.sortKey, dir=state.sortDir==='asc'?1:-1;
+  list.sort((a,b)=>{
+    let va=a[k], vb=b[k];
+    if(k==='review'||k==='used'){ return (va-vb)*dir; }
+    if(k==='time'){ return (va<vb?-1:va>vb?1:0)*dir; }
+    return String(va).localeCompare(String(vb),'zh')*dir;
+  });
+  return list;
+}
+
+function reviewTag(c){
+  return c.review>0
+    ? '<span class="tag t-review tag-link" role="link" tabindex="0" title="该条款有 '+c.review+' 条待重点复核任务，点击查看「关联复核任务」并自动定位" onclick="openReviewTasks(\''+c.id+'\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openReviewTasks(\''+c.id+'\')}">⚠ 待重点复核 '+c.review+'</span>'
+    : '<span style="color:var(--ink-3)">—</span>';
+}
+/* 标签跳转：条款详情&版本对比 → 关联复核任务 Tab，带 focus=pending 自动高亮定位待复核任务；go() 自动追加 ?role= */
+function openReviewTasks(id){
+  go('page7.html?id='+encodeURIComponent(id)+'&tab=tasks&focus=pending');
+}
+/* 板块一：高频常用条款。按标题右侧 Tab 切换类别，流式卡片自动换行；不受板块二筛选影响 */
+function hfList(){ return CLAUSES.filter(c=>c.cat===state.hfCat).sort((a,b)=>b.used-a.used); }
+function hfLabel(){ const t=HF_TABS.find(x=>x.cat===state.hfCat); return t?t.label:state.hfCat; }
+function switchHfTab(cat){
+  if(state.hfCat===cat) return;
+  state.hfCat=cat;
+  state.cardSel.clear(); /* 跨 Tab 不保留不可见卡片的选择，避免选中数与可见项不符 */
+  document.querySelectorAll('#hfTabs .tab').forEach(t=>{
+    const on=t.dataset.cat===cat;
+    t.classList.toggle('active',on);
+    if(t.setAttribute) t.setAttribute('aria-selected', on?'true':'false');
+  });
+  renderCards();
+  updateBatchBar();
+}
+function renderCards(){
+  const row=document.getElementById('cardRow');
+  const list=hfList();
+  const info=document.getElementById('hfCatInfo');
+  if(info) info.textContent='当前分类：'+hfLabel()+' · 共 '+list.length+' 条高频条款';
+  if(!list.length){ row.innerHTML='<div class="empty">该分类下暂无高频条款</div>'; bindSel(); return; }
+  const selectable = state.role!=='procurement';
+  row.innerHTML=list.map(c=>{
+    const sel=state.cardSel.has(c.id)?'checked':'';
+    const selCls=state.cardSel.has(c.id)?'sel':'';
+    const ck = selectable ? '<input type="checkbox" class="ck row-sel card-sel" data-id="'+c.id+'" '+sel+' aria-label="选择 '+c.title+'">' : '';
+    return '<div class="c-card '+selCls+'">'+
+      ck+
+      '<div class="ttl">'+c.title+'</div>'+
+      '<div class="meta">版本 '+c.version+' · '+c.id+'</div>'+
+      '<div><span class="tag t-cat">'+c.cat+'</span> <span class="tag t-cat">'+c.type+'</span></div>'+
+      '<div class="meta">'+c.note+'</div>'+
+      '<div>'+reviewTag(c)+'</div>'+
+      '<div class="op">'+
+        '<button class="btn btn-sm" onclick="openClause(\''+c.id+'\')">查看详情</button>'+
+        '<button class="btn btn-sm" onclick="openVersion(\''+c.id+'\')">版本记录</button>'+
+        '<button class="btn btn-sm btn-primary legal-only" onclick="go(\'page4.html\')">发起比对</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+  bindSel();
+}
+
+/* 最近浏览折叠面板：按更新时间取最近 8 条，点击条目跳条款详情（页面7） */
+function recentList(){
+  return CLAUSES.slice().sort((a,b)=>(a.time<b.time?1:a.time>b.time?-1:0)).slice(0,MAX_RECENT);
+}
+function renderRecent(){
+  const box=document.getElementById('recentList'), cnt=document.getElementById('recentCount');
+  const list=recentList();
+  if(cnt) cnt.textContent='共 '+list.length+' 条';
+  if(!box) return;
+  box.innerHTML = list.length
+    ? list.map(c=>'<button class="recent-item" title="查看条款详情：'+c.title+'" onclick="openClause(\''+c.id+'\')">'+
+        '<span class="rt">'+c.title+'</span>'+
+        '<span class="rm">'+c.id+' · '+c.version+' · '+c.time+'</span>'+
+      '</button>').join('')
+    : '<div class="recent-empty">暂无最近浏览记录</div>';
+}
+function toggleRecent(){
+  const wrap=document.getElementById('recentWrap'), btn=document.getElementById('recentBtn');
+  const open=!wrap.classList.contains('open');
+  wrap.classList.toggle('open',open);
+  if(btn.setAttribute) btn.setAttribute('aria-expanded',open?'true':'false');
+}
+function closeRecent(){
+  const wrap=document.getElementById('recentWrap'), btn=document.getElementById('recentBtn');
+  if(!wrap||!wrap.classList.contains('open')) return;
+  wrap.classList.remove('open');
+  if(btn.setAttribute) btn.setAttribute('aria-expanded','false');
+}
+
+/* 当前页可见条款 id：供表头全选与半选状态使用 */
+function visibleIds(){
+  const all=sortedList();
+  const pages=Math.max(1,Math.ceil(all.length/PAGE_SIZE));
+  if(state.page>pages) state.page=pages;
+  return all.slice((state.page-1)*PAGE_SIZE, state.page*PAGE_SIZE).map(c=>c.id);
+}
+function syncCheckAll(){
+  const ck=document.getElementById('checkAll'); if(!ck) return;
+  const ids=visibleIds();
+  const n=ids.filter(id=>state.tableSel.has(id)).length;
+  ck.checked = ids.length>0 && n===ids.length;
+  ck.indeterminate = n>0 && n<ids.length;
+  ck.disabled = state.role==='procurement' || ids.length===0;
+}
+function toggleCheckAll(ck){
+  if(state.role==='procurement'){ toast('采购专员无发起比对权限'); return; }
+  visibleIds().forEach(id=>{ if(ck.checked) state.tableSel.add(id); else state.tableSel.delete(id); });
+  renderTable(); updateBatchBar();
+}
+
+function renderTable(){
+  const all=sortedList();
+  const tb=document.getElementById('tbody');
+  const tip=document.getElementById('emptyTip');
+  const pager=document.getElementById('pager');
+  if(!all.length){
+    tb.innerHTML='';
+    tip.textContent = '无匹配条款';
+    tip.style.display='block';
+    pager.className='pager';
+    pager.innerHTML='';
+    syncCheckAll();
+    return;
+  }
+  tip.style.display='none';
+  const total=all.length;
+  const pages=Math.max(1, Math.ceil(total/PAGE_SIZE));
+  if(state.page>pages) state.page=pages;
+  const start=(state.page-1)*PAGE_SIZE;
+  const slice=all.slice(start, start+PAGE_SIZE);
+  const selectable = state.role!=='procurement';
+  tb.innerHTML=slice.map(c=>{
+    const ck = selectable ? '<input type="checkbox" class="row-sel table-sel" data-id="'+c.id+'" '+(state.tableSel.has(c.id)?'checked':'')+'>' : '<span style="color:var(--ink-3)">—</span>';
+    return '<tr>'+
+      '<td class="col-sel">'+ck+'</td>'+
+      '<td class="code">'+c.id+'</td>'+
+      '<td><b>'+c.title+'</b></td>'+
+      '<td><span class="tag t-cat">'+c.cat+'</span></td>'+
+      '<td>'+c.type+'</td>'+
+      '<td>'+c.version+'</td>'+
+      '<td>'+reviewTag(c)+'</td>'+
+      '<td style="color:var(--ink-3);">'+c.used+'</td>'+
+      '<td class="code">'+c.time+'</td>'+
+      '<td><div class="op">'+
+        '<button class="btn btn-sm" onclick="openClause(\''+c.id+'\')">查看详情</button>'+
+        '<button class="btn btn-sm" onclick="openVersion(\''+c.id+'\')">版本记录</button>'+
+        '<button class="btn btn-sm btn-primary legal-only" onclick="go(\'page4.html\')">发起比对</button>'+
+      '</div></td>'+
+    '</tr>';
+  }).join('');
+  // 表头排序指示
+  document.querySelectorAll('th[data-sort]').forEach(th=>{
+    const base=th.textContent.replace(/[▲▼]\s*$/,'');
+    th.innerHTML = base + (th.dataset.sort===state.sortKey ? ' <span class="sort-ico">'+(state.sortDir==='asc'?'▲':'▼')+'</span>' : '');
+  });
+  renderPager(total, pages);
+  syncCheckAll();
+  bindSel();
+}
+
+function renderPager(total, pages){
+  const pager=document.getElementById('pager');
+  let html='<span class="pg-info">共 '+total+' 条 · 第 '+state.page+' / '+pages+' 页</span>';
+  html+='<button class="pg-btn" '+(state.page<=1?'disabled':'')+' onclick="gotoPage('+(state.page-1)+')">上一页</button>';
+  for(let i=1;i<=pages;i++){ html+='<button class="pg-btn '+(i===state.page?'active':'')+'" onclick="gotoPage('+i+')">'+i+'</button>'; }
+  html+='<button class="pg-btn" '+(state.page>=pages?'disabled':'')+' onclick="gotoPage('+(state.page+1)+')">下一页</button>';
+  pager.className='pager show';
+  pager.innerHTML=html;
+}
+function gotoPage(p){ state.page=p; renderTable(); }
+
+/* 跳转条款详情 & 版本对比（页面7） */
+function openClause(id){ go('page7.html?id='+encodeURIComponent(id)+'&tab=detail'); }
+function openVersion(id){ go('page7.html?id='+encodeURIComponent(id)+'&tab=version'); }
+
+/* 两个板块各自独立的选中状态域：高频常用条款卡片(card) / 全部标准条款表格(table)。
+   复选框带 card-sel / table-sel 归属标记，事件委托按标记分流，互不干扰。 */
+let _selDelegated=false;
+function bindSel(){
+  if(_selDelegated) return;
+  _selDelegated=true;
+  const root=document.querySelector('.content')||document;
+  root.addEventListener('change',e=>{
+    const t=e.target;
+    if(!t||!t.classList||!t.classList.contains('row-sel')) return;
+    const isCard=t.classList.contains('card-sel');
+    const isTable=t.classList.contains('table-sel');
+    if(!isCard&&!isTable) return;
+    const set=isCard ? state.cardSel : state.tableSel;
+    const id=t.dataset.id;
+    if(t.checked) set.add(id); else set.delete(id);
+    const card=t.closest('.c-card'); if(card) card.classList.toggle('sel', t.checked);
+    updateBatchBar();
+  });
+}
+/* 只刷新指定区块的选择栏；另一区块的状态与控件完全不受影响 */
+function syncBar(scope, n){
+  const g = scope==='card'
+    ? ['cardSelInfo','cardBatchBtn','cardClearBtn']
+    : ['tableSelInfo','tableBatchBtn','tableClearBtn'];
+  const info=document.getElementById(g[0]); if(!info) return;
+  info.textContent = n>0 ? ('已选中 '+n+' 份') : '';
+  info.style.display = n>0 ? 'inline' : 'none';
+  const goBtn=document.getElementById(g[1]); if(goBtn) goBtn.disabled = (n===0);
+  const clBtn=document.getElementById(g[2]); if(clBtn) clBtn.style.display = n>0 ? 'inline-block' : 'none';
+}
+function updateBatchBar(){
+  syncBar('card',  state.cardSel.size);
+  syncBar('table', state.tableSel.size);
+}
+/* 取消选择：只清空并只重渲染本区块 */
+function clearSel(scope){
+  if(scope==='card'){ state.cardSel.clear(); renderCards(); }
+  else { state.tableSel.clear(); renderTable(); }
+  updateBatchBar();
+}
+/* 批量发起比对：只提交本板块勾选的条款 */
+function doBatchCompare(scope){
+  if(state.role==='procurement'){ toast('采购专员无发起比对权限'); return; }
+  const isCard = scope==='card';
+  const set = isCard ? state.cardSel : state.tableSel;
+  const n=set.size;
+  if(n===0){ toast('请先勾选条款'); return; }
+  const ids=[...set].join(',');
+  toast('已对「'+(isCard?'高频常用条款':'全部标准条款')+'」板块 '+n+' 条标准条款发起批量比对（演示）：'+ids);
+  go('page4.html?clauseIds='+encodeURIComponent(ids));
+}
+
+/* 权限 */
+function applyPerm(){
+  document.body.classList.toggle('role-procurement', state.role==='procurement');
+  document.body.classList.toggle('role-legal', state.role==='legal');
+  document.body.classList.toggle('role-admin', state.role==='admin');
+  document.getElementById('permHint').textContent=ROLE_LABEL[state.role];
+  document.querySelectorAll('.sb-admin-only').forEach(el=>{ el.style.display = state.role==='admin'?'flex':'none'; });
+  if(state.role==='procurement'){ state.cardSel.clear(); state.tableSel.clear(); }
+  renderCards(); renderTable(); updateBatchBar();
+}
+
+/* 绑定 */
+function bind(){
+  /* 板块二筛选：只驱动【全部标准条款】表格，不影响板块一高频 Tab */
+  document.getElementById('kw').addEventListener('input',e=>{state.kw=e.target.value;state.page=1;renderTable();});
+  document.getElementById('fCat').addEventListener('change',e=>{state.cat=e.target.value;state.page=1;renderTable();});
+  document.getElementById('fVersion').addEventListener('change',e=>{state.version=e.target.value;state.page=1;renderTable();});
+  document.getElementById('fType').addEventListener('change',e=>{state.type=e.target.value;state.page=1;renderTable();});
+  document.getElementById('fReview').addEventListener('change',e=>{state.onlyReview=e.target.checked;state.page=1;renderTable();});
+  const ca=document.getElementById('checkAll');
+  if(ca) ca.addEventListener('change',e=>toggleCheckAll(e.target));
+  /* 最近浏览折叠面板：默认收起，点击标题按钮切换；点面板外 / Esc 关闭 */
+  document.getElementById('recentBtn').addEventListener('click',e=>{ if(e.stopPropagation) e.stopPropagation(); toggleRecent(); });
+  document.getElementById('recentPanel').addEventListener('click',e=>{ if(e.stopPropagation) e.stopPropagation(); });
+  document.addEventListener('click',closeRecent);
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeRecent(); });
+  document.getElementById('roleSel').addEventListener('change',e=>{state.role=e.target.value;applyPerm();});
+  document.getElementById('sbToggle').addEventListener('click',()=>{
+    const sb=document.getElementById('sidebar'); sb.classList.toggle('collapsed');
+    document.getElementById('sbToggle').textContent=sb.classList.contains('collapsed')?'⟩':'⟨';
+  });
+  document.getElementById('addBtn').addEventListener('click',()=>toast('打开新增条款（演示）'));
+  document.getElementById('importBtn').addEventListener('click',()=>toast('打开导入条款（演示）'));
+  // 排序表头
+  document.querySelectorAll('th[data-sort]').forEach(th=>{
+    th.addEventListener('click',()=>{
+      const k=th.dataset.sort;
+      if(state.sortKey===k){ state.sortDir = state.sortDir==='asc'?'desc':'asc'; }
+      else { state.sortKey=k; state.sortDir='asc'; }
+      renderTable();
+    });
+  });
+  document.querySelectorAll('.sb-item[data-nav], .sb-sub[data-nav]').forEach(it=>{
+    it.addEventListener('click',()=>{
+      const nav=it.dataset.nav; const cfg=NAV[nav];
+      if(cfg&&cfg.page) return;
+      if(cfg&&cfg.url){ go(cfg.url); return; }
+      toast('演示原型：该模块暂未开放');
+    });
+  });
+}
+
+/* 初始化：读取 URL 角色，保持跨页一致 */
+(function init(){
+  const p=new URLSearchParams(location.search);
+  const r=p.get('role');
+  if(r&&['procurement','legal','admin'].includes(r)){ state.role=r; document.getElementById('roleSel').value=r; }
+  applyPerm();
+  bind();
+  renderRecent();
+})();
+</script>
+
+<script>
+(function(){
+  function toggleGroup(p){
+    var g=p.closest('.sb-group');
+    if(!g) return;
+    var willOpen=!g.classList.contains('open');
+    document.querySelectorAll('#sbNav .sb-group').forEach(function(x){x.classList.remove('open');});
+    if(willOpen) g.classList.add('open');
+  }
+  document.querySelectorAll('#sbNav .sb-group > .sb-parent').forEach(function(p){
+    p.addEventListener('click', function(){ toggleGroup(p); });
+  });
+  // 初始：仅展开含 active 项的组（其余折叠，满足手风琴默认折叠）
+  var act=document.querySelector('#sbNav .sb-item.active, #sbNav .sb-sub.active');
+  if(act){ var g=act.closest('.sb-group'); if(g) g.classList.add('open'); }
+})();
+</script>
+</body>
+</html>

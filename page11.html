@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>双盲审核工单 · 合同对比助手</title>
+<script src="tailwind.js"></script>
+<style>
+  :root{
+    --brand:#165DFF; --brand-weak:#E8F3FF; --ink-1:#1D2129; --ink-2:#4E5969; --ink-3:#86909C;
+    --line:#E5E6EB; --bg:#F7F8FA; --card:#fff;
+    --c-add:#B3E8C0; --c-del:#FFBFBF; --c-mod:#FFD9A8;
+    --risk-high:#F53F3F; --risk-mid:#D25F00; --risk-low:#00875A; --risk-none:#86909C;
+    --review-bg:#E9D5FF; --review-text:#6B21A8; --review-bd:#9333EA;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink-1);background:var(--bg);font-size:13px;}
+  .app{display:flex;flex-direction:row;height:100vh;overflow:hidden;}
+  /* 侧边导航（全站统一 9 项） */
+  .sidebar{width:220px;flex:0 0 220px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;transition:width .18s ease;min-height:0;}
+  .sidebar.collapsed{width:64px;flex-basis:64px;}
+  .sb-brand{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);height:56px;white-space:nowrap;overflow:hidden;}
+  .sidebar.collapsed .sb-brand span{display:none;}
+  .logo{width:30px;height:30px;border-radius:6px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:0 0 30px;}
+  .sb-nav{flex:1;overflow:auto;padding:8px;min-height:0;}
+  .sb-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;color:var(--ink-2);cursor:pointer;margin-bottom:2px;white-space:nowrap;overflow:hidden;}
+  .sb-item:hover{background:var(--bg);}
+  .sb-item.active{background:var(--brand-weak);color:var(--brand);font-weight:600;}
+  .sb-sub{padding-left:34px;font-size:13px;color:var(--ink-3);}
+  .sb-sub .ico{opacity:.5;}
+  .sb-sub:hover{background:var(--bg);}
+  .sb-sub.active{background:var(--brand-weak);color:var(--brand);font-weight:600;}
+  .sidebar.collapsed .sb-sub span{display:none;}
+  .code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--ink-2);}
+  .sb-item .ico{width:18px;height:18px;flex:0 0 18px;display:flex;align-items:center;justify-content:center;}
+  .sidebar.collapsed .sb-item span{display:none;}
+  .sb-foot{padding:10px 14px;border-top:1px solid var(--line);font-size:11px;color:var(--ink-3);line-height:1.7;white-space:nowrap;overflow:hidden;}
+  .sidebar.collapsed .sb-foot{display:none;}
+  .sb-toggle{position:absolute;top:64px;left:206px;width:22px;height:22px;border-radius:50%;background:#fff;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;color:var(--ink-3);transition:left .18s ease;}
+  .sidebar.collapsed .sb-toggle{left:50px;}
+  /* 主区 */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;}
+  .topbar{height:56px;flex:0 0 56px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 18px;}
+  .topbar h1{font-size:16px;margin:0;}
+  .topbar .crumb{font-size:12px;color:var(--ink-3);margin-top:2px;}
+  .top-right{display:flex;align-items:center;gap:12px;}
+  .role-sel{border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-size:12px;color:var(--ink-1);background:#fff;}
+  .content{flex:1;overflow:auto;padding:18px;}
+  .lock-note{font-size:12px;color:var(--ink-3);}
+  /* 锁屏 */
+  .lock-screen{display:none;flex:1;align-items:center;justify-content:center;padding:40px;}
+  .role-procurement .lock-screen{display:flex;}
+  .role-procurement .main-view{display:none;}
+  .lock-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:36px 40px;max-width:420px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.04);}
+  .lock-ico{width:52px;height:52px;border-radius:50%;background:var(--review-bg);color:var(--review-text);display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 14px;}
+  .lock-card h2{margin:0 0 8px;font-size:17px;}
+  .lock-card p{margin:0;font-size:13px;color:var(--ink-3);line-height:1.7;}
+  /* 统计卡 */
+  .stats{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:6px;padding:12px 18px;min-width:120px;}
+  .stat .n{font-size:22px;font-weight:700;}
+  .stat .l{font-size:12px;color:var(--ink-3);margin-top:2px;}
+  .stat.add .n{color:var(--risk-low);} .stat.del .n{color:var(--risk-high);}
+  .stat.mod .n{color:var(--risk-mid);} .stat.same .n{color:var(--ink-3);}
+  /* 子导航（工单切换） */
+  .subnav{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;}
+  .subnav .sn{padding:6px 16px;border-radius:6px;background:#fff;border:1px solid var(--line);font-size:13px;color:var(--ink-2);cursor:pointer;}
+  .subnav .sn:hover{background:var(--bg);}
+  .subnav .sn.active{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600;}
+  .sec-title{font-size:14px;font-weight:600;color:var(--ink-1);margin:18px 0 10px;display:flex;align-items:center;gap:8px;}
+  .sec-title .line{width:3px;height:14px;background:var(--brand);border-radius:2px;}
+  .filterbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#fff;border:1px solid var(--line);border-radius:6px;padding:12px;margin-bottom:14px;}
+  .f-input,.f-select{border:1px solid var(--line);border-radius:4px;padding:7px 10px;font-size:13px;color:var(--ink-1);background:#fff;}
+  .f-input{min-width:240px;}
+  .spacer{flex:1;}
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink-1);border-radius:4px;padding:5px 10px;font-size:12px;cursor:pointer;}
+  .btn:hover{background:var(--bg);}
+  .btn-primary{background:var(--brand);border-color:var(--brand);color:#fff;}
+  .btn-primary:hover{background:#0E4AD0;}
+  .btn-sm{padding:3px 8px;font-size:12px;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  /* 表格 */
+  .card{background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  table{width:100%;border-collapse:collapse;}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:middle;}
+  th{background:#FAFBFC;color:var(--ink-3);font-weight:600;font-size:12px;}
+  tbody tr{cursor:default;transition:background .12s;}
+  tbody tr:hover{background:var(--brand-weak);}
+  .op{display:flex;gap:6px;flex-wrap:wrap;}
+  .empty{padding:32px;text-align:center;color:var(--ink-3);}
+  /* 标签 */
+  .tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;line-height:1.5;}
+  .t-cat{background:#F2F3F5;color:var(--ink-2);}
+  .t-risk{color:#fff;}
+  .t-high{background:var(--risk-high);} .t-mid{background:var(--risk-mid);} .t-low{background:var(--risk-low);} .t-none{background:var(--risk-none);}
+  .t-add{background:var(--c-add);color:var(--ink-1);}
+  .t-del{background:var(--c-del);color:var(--ink-1);}
+  .t-mod{background:var(--c-mod);color:var(--ink-1);}
+  .t-same{background:#F2F3F5;color:var(--ink-2);}
+  .t-review{background:var(--review-bg);color:var(--review-text);border:1px solid var(--review-bd);}
+  .t-active{background:var(--c-add);color:var(--ink-1);}
+  .t-pending{background:#FFF3E8;color:#D25F00;border:1px solid #FFD9A8;}
+  .t-done{background:var(--brand-weak);color:var(--brand);border:1px solid #BEDAFF;}
+  .t-arb{background:#FFECEC;color:var(--risk-high);border:1px solid #FFBFBF;}
+  /* 盲审弹窗 */
+  .note{background:var(--review-bg);color:var(--review-text);border:1px solid var(--review-bd);border-radius:6px;padding:8px 12px;font-size:12px;margin:10px 0;line-height:1.6;}
+  .rev-switch{display:flex;gap:8px;margin:10px 0;}
+  .rev-switch .rv{padding:6px 16px;border-radius:6px;border:1px solid var(--line);background:#fff;font-size:13px;cursor:pointer;}
+  .rev-switch .rv.active{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600;}
+  .fld{margin:10px 0;}
+  .fld label{display:block;font-size:12px;color:var(--ink-3);margin-bottom:4px;}
+  .fld select,.fld textarea{border:1px solid var(--line);border-radius:4px;padding:7px 10px;font-size:13px;width:100%;font-family:inherit;}
+  .fld textarea{min-height:64px;resize:vertical;}
+  .blk{border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin-bottom:10px;}
+  .blk .bt{font-size:12px;font-weight:600;margin-bottom:8px;color:var(--ink-2);display:flex;align-items:center;gap:6px;}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media(max-width:920px){ .two-col{grid-template-columns:1fr;} }
+  /* 权限显隐 */
+  .role-procurement .mgr-only{display:none;}
+  .role-legal .mgr-only{display:none;}
+  /* 弹窗 / toast */
+  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:100;}
+  .modal-mask.show{display:flex;}
+  .modal-box{position:relative;}
+  .modal{background:#fff;border-radius:8px;width:min(560px,94vw);max-height:88vh;overflow:auto;padding:22px;}
+  .modal h3{margin:0 0 14px;font-size:16px;}
+  .modal-close{position:absolute;top:-14px;right:-14px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border:none;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.18);font-size:20px;line-height:1;color:var(--ink-3);cursor:pointer;border-radius:6px;z-index:2;}
+  .modal-close:hover{background:#F2F3F5;color:var(--ink-1);}
+  .toast{position:fixed;left:50%;top:24px;transform:translateX(-50%);background:rgba(29,33,41,.92);color:#fff;padding:9px 16px;border-radius:6px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:200;}
+  .toast.show{opacity:1;}
+.icon-btn{border:1px solid var(--line);background:#fff;border-radius:4px;width:30px;height:30px;cursor:pointer;color:var(--ink-2);font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;flex:0 0 30px;}
+.icon-btn:hover{border-color:var(--brand);color:var(--brand);}
+.topbar{gap:12px;}
+.top-right{margin-left:auto;}
+.sidebar.collapsed .sb-item span,.sidebar.collapsed .sb-sub span{display:none;}
+
+  /* 二级菜单手风琴 */
+  .sb-children{display:none;}
+  .sb-group.open .sb-children{display:block;}
+  .sb-caret{margin-left:auto;font-size:11px;line-height:1;color:var(--ink-3);transition:transform .15s;transform:rotate(0deg);}
+  .sb-group.open > .sb-parent .sb-caret{transform:rotate(90deg);}
+  .sb-children .sb-sub{padding-left:32px;}
+  .sidebar.collapsed .sb-children{display:none!important;}
+  .sidebar.collapsed .sb-caret{display:none;}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 侧边导航（全站统一） -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-brand"><div class="logo">C</div><span>合同对比助手</span></div>
+          <div class="sb-nav" id="sbNav">
+        <div class="sb-group" data-group="ledger">
+          <div class="sb-item sb-parent" data-nav="ledger"><span class="ico">▤</span><span>合同台账</span><span class="sb-caret">▸</span></div>
+          <div class="sb-children">
+            <div class="sb-sub" data-nav="detail"><span class="ico">›</span><span>合同详情</span></div>
+          </div>
+        </div>
+        <div class="sb-group" data-group="tasks">
+          <div class="sb-item sb-parent" data-nav="tasks"><span class="ico">☰</span><span>比对任务管理</span><span class="sb-caret">▸</span></div>
+          <div class="sb-children">
+            <div class="sb-sub" data-nav="new"><span class="ico">＋</span><span>新建比对任务</span></div>
+            <div class="sb-sub" data-nav="review"><span class="ico">✎</span><span>对比复核页</span></div>
+          </div>
+        </div>
+        <div class="sb-group" data-group="std">
+          <div class="sb-item sb-parent" data-nav="std"><span class="ico">📘</span><span>标准条款库</span><span class="sb-caret">▸</span></div>
+          <div class="sb-children">
+            <div class="sb-sub" data-nav="clauseDetail"><span class="ico">›</span><span>条款详情&amp;版本对比</span></div>
+          </div>
+        </div>
+        <div class="sb-item" data-nav="risk"><span class="ico">⚠</span><span>风险条款库</span></div>
+        <div class="sb-item" data-nav="eval"><span class="ico">📊</span><span>评测集管理</span></div>
+        <div class="sb-item active" data-nav="qc"><span class="ico">✓</span><span>双盲审核工单</span></div>
+        <div class="sb-item" data-nav="rule"><span class="ico">⚙</span><span>风控规则配置</span></div>
+        <div class="sb-group" data-group="archive">
+          <div class="sb-item sb-parent" data-nav="archive"><span class="ico">🗄</span><span>复核报告归档</span><span class="sb-caret">▸</span></div>
+          <div class="sb-children">
+            <div class="sb-sub" data-nav="reportDetail"><span class="ico">›</span><span>复核报告详情</span></div>
+          </div>
+        </div>
+        <div class="sb-item sb-admin-only" data-nav="setting" style="display:none;"><span class="ico">⚷</span><span>系统权限设置</span></div>
+      </div>
+    <div class="sb-foot">一期 规则引擎+差异模型<br>二期 样本相似度+难例挖掘<br>无大模型自动解读</div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+        <button class="icon-btn" id="sbToggle" title="收起/展开侧边栏">☰</button>
+        <button class="icon-btn" id="backBtn" title="返回上一页" onclick="history.back()">‹</button>
+      <div>
+        <h1>双盲审核工单</h1>
+        <div class="crumb">合同对比助手 / 双盲审核工单（二期质量闭环）</div>
+      </div>
+      <div class="top-right">
+        <span class="lock-note" id="permHint"></span>
+        <label class="lock-note">角色</label>
+        <select class="role-sel" id="roleSel">
+          <option value="procurement">采购专员</option>
+          <option value="legal" selected>法务审核员</option>
+          <option value="admin">管理员</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- 采购无权限锁屏 -->
+      <div class="lock-screen">
+        <div class="lock-card">
+          <div class="lock-ico">🔒</div>
+          <h2>采购专员无访问权限</h2>
+          <p>双盲审核工单为<strong>法务专家 / 管理员专用</strong>的二期质检闭环，涉及独立盲审与分歧仲裁。请切换角色或联系管理员。</p>
+        </div>
+      </div>
+
+      <!-- 主视图（法务 / 管理员） -->
+      <div class="main-view">
+        <!-- 统计 -->
+        <div class="stats" id="stats"></div>
+
+        <!-- 工单切换 -->
+        <div class="subnav" id="tabNav">
+          <div class="sn active" data-tab="blind">待办工单</div>
+          <div class="sn" data-tab="arb">仲裁列表</div>
+          <div class="sn" data-tab="done">已完成工单</div>
+        </div>
+
+        <!-- 工单列表 -->
+        <div class="card">
+          <table>
+            <thead>
+              <tr><th>工单编号</th><th>来源合同</th><th>差异条款</th><th>状态</th><th>结论摘要</th><th>操作</th></tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+          <div class="empty" id="emptyTip" style="display:none;">该分类下暂无工单</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 盲审弹窗 -->
+<div class="modal-mask" id="blindMask">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('blindMask')" aria-label="关闭">×</button>
+    <div class="modal" id="blindBody"></div>
+  </div>
+</div>
+<!-- 仲裁弹窗 -->
+<div class="modal-mask" id="arbMask">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('arbMask')" aria-label="关闭">×</button>
+    <div class="modal" id="arbBody"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const NAV = {
+  ledger:{url:'page1.html'},
+  tasks:{url:'page3.html'},
+  new:{url:'page4.html'},
+  std:{url:'page6.html'},
+  risk:{url:'page9.html'},
+  eval:{url:'page10.html'},
+  qc:{page:true},
+  rule:{url:'page12.html'},
+  archive:{url:'page13.html'},
+  detail:{url:'page2.html'},
+  review:{url:'page5.html'},
+  clauseDetail:{url:'page7.html'},
+  reportDetail:{url:'page8.html'},
+
+  setting:{}
+};
+const ROLE_LABEL = {procurement:'采购专员（无访问权限）', legal:'法务审核员（可盲审 / 仲裁）', admin:'管理员（可盲审 / 仲裁）'};
+
+const ST_LABEL={add:'新增',del:'删除',mod:'修改',same:'一致'};
+const RISK_LABEL={high:'高风险',mid:'中风险',low:'低风险',none:'无风险'};
+const RISK_TAG={high:'t-high',mid:'t-mid',low:'t-low',none:'t-none'};
+const ST_TAG={add:'t-add',del:'t-del',mod:'t-mod',same:'t-same'};
+
+// 双盲审核工单（双人独立盲审 → 一致入评测集 / 分歧进仲裁）
+const WOS = [
+  {id:'QC-201', src:'HT-SUP-2026-001', clause:'5.3 违约责任', diff:'d3', status:'blind',
+   A:{done:false,type:'',risk:'',note:''}, B:{done:false,type:'',risk:'',note:''}},
+  {id:'QC-202', src:'HT-SUP-2026-001', clause:'7.2 交付地点', diff:'d5', status:'blind',
+   A:{done:true,type:'mod',risk:'mid',note:'运费承担主体表述模糊'}, B:{done:false,type:'',risk:'',note:''}},
+  {id:'QC-203', src:'HT-SUP-2026-003', clause:'9.1 不可抗力', diff:'d7', status:'arb',
+   A:{done:true,type:'mod',risk:'high',note:'解除条件偏宽松，应升级'},
+   B:{done:true,type:'same',risk:'none',note:'认为与标准一致'},
+   arb:null},
+  {id:'QC-204', src:'HT-SUP-2026-002', clause:'3.2 付款账期', diff:'d1', status:'done', agree:true, evalId:'EV-009'},
+  {id:'QC-205', src:'HT-SUP-2026-001', clause:'6.1 保密义务', diff:'d4', status:'done', agree:true, evalId:'EV-010'}
+];
+
+const state = { role:'legal', tab:'blind', blindRev:'A', evalSeq:10 };
+
+/* ============ 评测集真值样本：内置双盲遮蔽 ============
+   来自【页面12】真值复核的样本生成独立工单，遮蔽系统初判 / 法务复核 / 入库审批意见 / 真值答案；
+   盲审结论回写 CLM_BLIND_RESULT_V1，供【页面10】自动统计指标。 */
+const EVAL_TRUTH_KEY='CLM_EVAL_TRUTH_V1';
+const BLIND_RESULT_KEY='CLM_BLIND_RESULT_V1';
+function loadEvalTruth(){ try{ const a=JSON.parse(localStorage.getItem(EVAL_TRUTH_KEY)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function mergeTruthWorkOrders(){
+  loadEvalTruth().forEach(t=>{
+    const id='QC-TR-'+String(t.sampleId||'').replace(/[^0-9A-Za-z-]/g,'');
+    if(WOS.some(w=>w.id===id)) return;
+    WOS.push({id, src:'HT-SUP-2026-001', clause:(t.clause||'风险条款')+(t.summary?(' · '+t.summary):''),
+      diff:t.srcCase||'d1', status:'blind',
+      A:{done:false,type:'',risk:'',note:''}, B:{done:false,type:'',risk:'',note:''},
+      fromTruth:true, blindHidden:true, truthSampleId:t.sampleId});
+  });
+}
+function writeBlindResult(w,type,risk){
+  if(!w.fromTruth) return;
+  try{
+    const list=JSON.parse(localStorage.getItem(BLIND_RESULT_KEY)||'[]');
+    const d=new Date(),p=n=>String(n).padStart(2,'0');
+    const rec={sampleId:w.truthSampleId,woId:w.id,type,risk,
+      time:d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()),
+      source:w.agree?'双人盲审一致':'负责人仲裁'};
+    const i=list.findIndex(x=>x.sampleId===w.truthSampleId);
+    if(i<0) list.push(rec); else list[i]=rec;
+    localStorage.setItem(BLIND_RESULT_KEY,JSON.stringify(list));
+  }catch(e){}
+}
+
+function go(url){ window.location.href = url + (url.indexOf('?')>-1?'&':'?') + 'role=' + state.role; }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2000); }
+function showModal(id){ document.getElementById(id).classList.add('show'); }
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+function stat(n,l,cls){ return '<div class="stat '+cls+'"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>'; }
+function findW(id){ return WOS.find(x=>x.id===id); }
+function ans(g){ return '<span class="tag '+ST_TAG[g.type]+'">'+ST_LABEL[g.type]+'</span> <span class="tag '+RISK_TAG[g.risk]+' t-risk">'+RISK_LABEL[g.risk]+'</span>'; }
+
+function renderStats(){
+  const blind=WOS.filter(w=>w.status==='blind').length;
+  const arb=WOS.filter(w=>w.status==='arb').length;
+  const done=WOS.filter(w=>w.status==='done').length;
+  document.getElementById('stats').innerHTML=[
+    stat(blind,'待双盲','mod'),
+    stat(arb,'待仲裁','del'),
+    stat(done,'已完成','add'),
+    stat(WOS.length,'工单总数','same')
+  ].join('');
+}
+
+function verdictSummary(w){
+  if(w.status==='done'){
+    if(w.agree) return '双方一致 → 已纳入 '+w.evalId;
+    return '经仲裁 → 已纳入 '+(w.evalId||'评测集');
+  }
+  if(w.status==='arb'){
+    return 'A：'+ST_LABEL[w.A.type]+'/'+RISK_LABEL[w.A.risk]+' ｜ B：'+ST_LABEL[w.B.type]+'/'+RISK_LABEL[w.B.risk]+'（分歧）';
+  }
+  const a=w.A.done?'A已阅卷':'A未阅卷', b=w.B.done?'B已阅卷':'B未阅卷';
+  return a+' ｜ '+b;
+}
+
+function renderTable(){
+  const list=WOS.filter(w=>w.status===state.tab);
+  const tb=document.getElementById('tbody');
+  if(!list.length){ tb.innerHTML=''; document.getElementById('emptyTip').style.display='block'; return; }
+  document.getElementById('emptyTip').style.display='none';
+  tb.innerHTML=list.map(w=>{
+    let statusTag = w.status==='blind'?'<span class="tag t-pending">待双盲</span>'
+      : w.status==='arb'?'<span class="tag t-arb">待仲裁</span>'
+      : '<span class="tag t-done">已完成</span>';
+    let op='';
+    if(w.status==='blind') op='<button class="btn btn-sm btn-primary" onclick="openBlind(\''+w.id+'\')">进入盲审</button>';
+    else if(w.status==='arb') op='<button class="btn btn-sm btn-primary" onclick="openArb(\''+w.id+'\')">进入仲裁</button>';
+    else op='<button class="btn btn-sm" onclick="openBlind(\''+w.id+'\')">查看</button>';
+    op+='<button class="btn btn-sm" onclick="traceOrigin(\''+w.id+'\')">溯源原文</button>';
+    return '<tr>'+
+      '<td class="code">'+w.id+'</td>'+
+      '<td class="code">'+w.src+'</td>'+
+      '<td><b>'+w.clause+'</b>'+(w.fromTruth?' <span class="tag t-review" title="原有判定记录已遮蔽">评测集·已遮蔽</span>':'')+'</td>'+
+      '<td>'+statusTag+'</td>'+
+      '<td>'+verdictSummary(w)+'</td>'+
+      '<td><div class="op">'+op+'</div></td>'+
+    '</tr>';
+  }).join('');
+}
+function renderAll(){ renderStats(); renderTable(); }
+
+/* 溯源：跳转复核审阅页（页面5），query 在 hash 前，自动高亮对应差异 */
+function traceOrigin(id){ const w=findW(id); if(!w) return; window.location.href='page5.html?role='+encodeURIComponent(state.role)+'#'+w.diff; }
+
+/* 盲审弹窗 */
+function openBlind(id){
+  state.blindRev='A';
+  const w=findW(id); if(!w) return;
+  document.getElementById('blindBody').innerHTML=buildBlind(w);
+  showModal('blindMask');
+}
+function buildBlind(w){
+  if(w.status==='done'){
+    return '<h3>工单详情 · '+w.id+'（已完成）</h3>'+
+      infoLine(w)+
+      '<div class="blk"><div class="bt">阅卷人 A</div>'+ans(w.A)+'<div style="margin-top:6px;color:var(--ink-2);">'+w.A.note+'</div></div>'+
+      '<div class="blk"><div class="bt">阅卷人 B</div>'+ans(w.B)+'<div style="margin-top:6px;color:var(--ink-2);">'+w.B.note+'</div></div>';
+  }
+  const rev=state.blindRev;
+  const other=rev==='A'?'B':'A';
+  const cur=w[rev];
+  const otherState=w[other].done?('（'+other+' 已独立完成阅卷，当前不可见）'):'（'+other+' 尚未阅卷）';
+  return '<h3>双盲阅卷 · '+w.id+'</h3>'+
+    infoLine(w)+
+    '<div class="note">'+(w.fromTruth
+      ? '评测集真值样本 · <strong>双盲遮蔽已启用</strong>：系统初判、法务复核最终结论、入库审批意见与真值答案均已遮蔽，仅展示原文上下文；阅卷人之间结论互不可见。'
+      : '盲审模式：系统初判已屏蔽，阅卷人之间结论<strong>互不可见</strong>。请分别独立完成后提交比对。')+'</div>'+
+    '<div class="rev-switch">'+
+      '<div class="rv '+(rev==='A'?'active':'')+'" onclick="setRev(\''+w.id+'\',\'A\')">阅卷人 A</div>'+
+      '<div class="rv '+(rev==='B'?'active':'')+'" onclick="setRev(\''+w.id+'\',\'B\')">阅卷人 B</div>'+
+    '</div>'+
+    '<div style="font-size:12px;color:var(--ink-3);margin-bottom:8px;">当前以 <b>阅卷人 '+rev+'</b> 身份标注 '+otherState+'</div>'+
+    '<div class="fld"><label>差异类型</label><select onchange="updRev(\''+w.id+'\',\''+rev+'\',\'type\',this.value)">'+
+      optType(cur.type)+'</select></div>'+
+    '<div class="fld"><label>风险等级</label><select onchange="updRev(\''+w.id+'\',\''+rev+'\',\'risk\',this.value)">'+
+      optRisk(cur.risk)+'</select></div>'+
+    '<div class="fld"><label>审核意见</label><textarea oninput="updRevNote(\''+w.id+'\',\''+rev+'\',this.value)">'+cur.note+'</textarea></div>'+
+    (w.A.done&&w.B.done
+      ? '<button class="btn btn-primary" onclick="commitBlind(\''+w.id+'\')">提交并比对双方结论</button>'
+      : '<div style="font-size:12px;color:var(--ink-3);margin-top:6px;">需双方均完成阅卷后方可提交</div>');
+}
+function optType(v){ const a=['','add','del','mod','same']; return a.map(k=>'<option value="'+k+'"'+(k===v?' selected':'')+'>'+(k?ST_LABEL[k]:'请选择')+'</option>').join(''); }
+function optRisk(v){ const a=['','high','mid','low','none']; return a.map(k=>'<option value="'+k+'"'+(k===v?' selected':'')+'>'+(k?RISK_LABEL[k]:'请选择')+'</option>').join(''); }
+function infoLine(w){ return '<div class="blk"><div class="bt">工单信息</div>'+
+  '<div style="font-size:13px;line-height:1.8;">来源合同：<b class="code">'+w.src+'</b><br>差异条款：<b>'+w.clause+'</b>（差异ID '+w.diff+'）<br>'+
+  '<button class="btn btn-sm" style="margin-top:6px;" onclick="traceOrigin(\''+w.id+'\')">溯源原文上下文</button></div></div>'; }
+function setRev(id,rev){ state.blindRev=rev; document.getElementById('blindBody').innerHTML=buildBlind(findW(id)); }
+function updRev(id,rev,field,val){ const w=findW(id); w[rev][field]=val; if(val) w[rev].done=true; }
+function updRevNote(id,rev,val){ findW(id)[rev].note=val; }
+
+function commitBlind(id){
+  const w=findW(id);
+  if(!w.A.done||!w.B.done){ toast('需双方均完成阅卷'); return; }
+  const agree = w.A.type===w.B.type && w.A.risk===w.B.risk;
+  if(agree){
+    w.status='done'; w.agree=true; w.evalId='EV-'+(900+ (++state.evalSeq));
+    writeBlindResult(w,w.A.type,w.A.risk);
+    toast('结论一致，已自动纳入评测集 '+w.evalId);
+  } else {
+    w.status='arb'; w.arb=null;
+    toast('结论分歧，已进入负责人仲裁流程');
+  }
+  closeModal('blindMask'); renderAll();
+}
+
+/* 仲裁弹窗 */
+function openArb(id){
+  const w=findW(id); if(!w) return;
+  document.getElementById('arbBody').innerHTML=
+    '<h3>分歧仲裁 · '+w.id+'</h3>'+ infoLine(w)+
+    '<div class="two-col">'+
+      '<div class="blk"><div class="bt">阅卷人 A 结论</div>'+ans(w.A)+'<div style="margin-top:6px;color:var(--ink-2);">'+w.A.note+'</div></div>'+
+      '<div class="blk"><div class="bt">阅卷人 B 结论</div>'+ans(w.B)+'<div style="margin-top:6px;color:var(--ink-2);">'+w.B.note+'</div></div>'+
+    '</div>'+
+    '<div class="fld"><label>仲裁裁定（采纳）</label><select id="arbAdopt">'+
+      '<option value="A">采纳 A：'+ST_LABEL[w.A.type]+'/'+RISK_LABEL[w.A.risk]+'</option>'+
+      '<option value="B">采纳 B：'+ST_LABEL[w.B.type]+'/'+RISK_LABEL[w.B.risk]+'</option>'+
+    '</select></div>'+
+    '<div class="fld"><label>仲裁意见</label><textarea id="arbNote" placeholder="填写统一判罚口径与依据"></textarea></div>'+
+    '<button class="btn btn-primary" onclick="commitArb(\''+w.id+'\')">确认仲裁并纳入评测集</button>';
+  showModal('arbMask');
+}
+function commitArb(id){
+  const w=findW(id);
+  const adopt=document.getElementById('arbAdopt').value;
+  const note=document.getElementById('arbNote').value;
+  w.status='done'; w.agree=false; w.evalId='EV-'+(900+(++state.evalSeq));
+  w.arb={adopt, note};
+  writeBlindResult(w,w[adopt].type,w[adopt].risk);
+  closeModal('arbMask');
+  toast('仲裁完成（采纳 '+adopt+'），已纳入评测集 '+w.evalId);
+  renderAll();
+}
+
+/* 权限 */
+function applyPerm(){
+  document.body.classList.toggle('role-procurement', state.role==='procurement');
+  document.body.classList.toggle('role-legal', state.role==='legal');
+  document.body.classList.toggle('role-admin', state.role==='admin');
+  document.getElementById('permHint').textContent=ROLE_LABEL[state.role];
+  document.querySelectorAll('.sb-admin-only').forEach(el=>{ el.style.display = state.role==='admin'?'flex':'none'; });
+  renderAll();
+}
+
+/* 绑定 */
+function bind(){
+  document.getElementById('tabNav').addEventListener('click',e=>{
+    const sn=e.target.closest('.sn'); if(!sn) return;
+    document.querySelectorAll('#tabNav .sn').forEach(x=>x.classList.remove('active'));
+    sn.classList.add('active'); state.tab=sn.dataset.tab; renderTable();
+  });
+  document.getElementById('roleSel').addEventListener('change',e=>{state.role=e.target.value;applyPerm();});
+  document.getElementById('sbToggle').addEventListener('click',()=>{
+    const sb=document.getElementById('sidebar'); sb.classList.toggle('collapsed');
+    document.getElementById('sbToggle').textContent=sb.classList.contains('collapsed')?'⟩':'⟨';
+  });
+  document.querySelectorAll('.sb-item[data-nav], .sb-sub[data-nav]').forEach(it=>{
+    it.addEventListener('click',()=>{
+      const nav=it.dataset.nav; const cfg=NAV[nav];
+      if(cfg&&cfg.page) return;
+      if(cfg&&cfg.url){ go(cfg.url); return; }
+      toast('演示原型：该模块暂未开放');
+    });
+  });
+}
+
+/* 初始化：读取 URL 角色，保持跨页一致 */
+(function init(){
+  const p=new URLSearchParams(location.search);
+  const r=p.get('role');
+  if(r&&['procurement','legal','admin'].includes(r)){ state.role=r; document.getElementById('roleSel').value=r; }
+  mergeTruthWorkOrders();
+  renderStats(); renderTable(); applyPerm(); bind();
+})();
+</script>
+
+<script>
+(function(){
+  function toggleGroup(p){
+    var g=p.closest('.sb-group');
+    if(!g) return;
+    var willOpen=!g.classList.contains('open');
+    document.querySelectorAll('#sbNav .sb-group').forEach(function(x){x.classList.remove('open');});
+    if(willOpen) g.classList.add('open');
+  }
+  document.querySelectorAll('#sbNav .sb-group > .sb-parent').forEach(function(p){
+    p.addEventListener('click', function(){ toggleGroup(p); });
+  });
+  // 初始：仅展开含 active 项的组（其余折叠，满足手风琴默认折叠）
+  var act=document.querySelector('#sbNav .sb-item.active, #sbNav .sb-sub.active');
+  if(act){ var g=act.closest('.sb-group'); if(g) g.classList.add('open'); }
+})();
+</script>
+</body>
+</html>
