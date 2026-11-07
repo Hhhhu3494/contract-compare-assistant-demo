@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>双盲真值复核工单详情 · 合同对比助手</title>
+<script src="tailwind.js"></script>
+<style>
+  :root{
+    --brand:#165DFF; --brand-weak:#E8F3FF; --ink-1:#1D2129; --ink-2:#4E5969; --ink-3:#86909C;
+    --line:#E5E6EB; --bg:#F7F8FA; --card:#fff;
+    --c-add:#B3E8C0; --c-del:#FFBFBF; --c-mod:#FFD9A8;
+    --risk-high:#F53F3F; --risk-mid:#D25F00; --risk-low:#00875A; --risk-none:#86909C;
+    --review-bg:#E9D5FF; --review-text:#6B21A8; --review-bd:#9333EA;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink-1);background:var(--bg);font-size:13px;}
+  .app{display:flex;flex-direction:row;height:100vh;overflow:hidden;}
+
+  /* ===== 侧边导航（全站统一 9 项 + 手风琴二级） ===== */
+  .sidebar{width:220px;flex:0 0 220px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;transition:width .18s ease;min-height:0;}
+  .sidebar.collapsed{width:64px;flex-basis:64px;}
+  .sb-brand{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);height:56px;white-space:nowrap;overflow:hidden;}
+  .logo{width:30px;height:30px;border-radius:6px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:0 0 30px;}
+  .sidebar.collapsed .sb-brand span{display:none;}
+  .sb-nav{flex:1;overflow:auto;padding:8px;min-height:0;}
+  .sb-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;color:var(--ink-2);cursor:pointer;margin-bottom:2px;white-space:nowrap;overflow:hidden;}
+  .sb-item:hover{background:var(--bg);}
+  .sb-item.active{background:var(--brand-weak);color:var(--brand);font-weight:600;}
+  .sb-sub{padding-left:34px;font-size:13px;color:var(--ink-3);}
+  .sb-sub .ico{opacity:.5;}
+  .sb-sub:hover{background:var(--bg);}
+  .sb-sub.active{background:var(--brand-weak);color:var(--brand);font-weight:600;}
+  .sb-item .ico{width:18px;height:18px;flex:0 0 18px;display:flex;align-items:center;justify-content:center;}
+  .sidebar.collapsed .sb-item span,.sidebar.collapsed .sb-sub span{display:none;}
+  .sb-foot{padding:10px 14px;border-top:1px solid var(--line);font-size:11px;color:var(--ink-3);line-height:1.7;white-space:nowrap;overflow:hidden;}
+  .sidebar.collapsed .sb-foot{display:none;}
+  .sb-children{display:none;}
+  .sb-group.open .sb-children{display:block;}
+  .sb-caret{margin-left:auto;font-size:11px;line-height:1;color:var(--ink-3);transition:transform .15s;transform:rotate(0deg);}
+  .sb-group.open > .sb-parent .sb-caret{transform:rotate(90deg);}
+  .sb-children .sb-sub{padding-left:32px;}
+  .sidebar.collapsed .sb-children{display:none!important;}
+  .sidebar.collapsed .sb-caret{display:none;}
+
+  /* ===== 主区 / 顶栏 ===== */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;}
+  .topbar{height:56px;flex:0 0 56px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:0 18px;}
+  .topbar h1{font-size:16px;margin:0;}
+  .topbar .crumb{font-size:12px;color:var(--ink-3);margin-top:2px;}
+  .top-right{display:flex;align-items:center;gap:10px;margin-left:auto;}
+  .icon-btn{border:1px solid var(--line);background:#fff;border-radius:4px;width:30px;height:30px;cursor:pointer;color:var(--ink-2);font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;flex:0 0 30px;}
+  .icon-btn:hover{border-color:var(--brand);color:var(--brand);}
+  .role-sel{border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-size:12px;color:var(--ink-1);background:#fff;}
+  .lock-note{font-size:12px;color:var(--ink-3);}
+
+  /* ===== 通用控件 / 标签 / 锁屏 / toast / 弹窗 ===== */
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink-1);border-radius:4px;padding:6px 12px;font-size:12px;cursor:pointer;}
+  .btn:hover{border-color:var(--brand);color:var(--brand);}
+  .btn-primary{background:var(--brand);border-color:var(--brand);color:#fff;}
+  .btn-primary:hover{background:#0E4AD0;color:#fff;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;border-color:var(--line);color:var(--ink-1);}
+  .btn-sm{padding:4px 9px;}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;}
+  .seg button{border:none;background:#fff;padding:6px 12px;color:var(--ink-2);cursor:pointer;font-size:13px;}
+  .seg button.on{background:var(--brand);color:#fff;}
+  .tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;line-height:1.5;}
+  .t-pending{background:#FFF3E8;color:#D25F00;border:1px solid #FFD9A8;}
+  .t-done{background:var(--brand-weak);color:var(--brand);border:1px solid #BEDAFF;}
+  .t-arb{background:#FFECEC;color:var(--risk-high);border:1px solid #FFBFBF;}
+  .t-truth{background:var(--review-bg);color:var(--review-text);border:1px solid var(--review-bd);}
+  .t-neutral{background:#F2F3F5;color:var(--ink-2);border:1px solid var(--line);}
+  .lock-screen{display:none;flex:1;align-items:center;justify-content:center;padding:40px;}
+  .role-legal .lock-screen{display:flex;}
+  .role-legal .main-view{display:none;}
+  .lock-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:36px 40px;max-width:460px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.04);}
+  .lock-ico{width:52px;height:52px;border-radius:50%;background:var(--review-bg);color:var(--review-text);display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 14px;}
+  .lock-card h2{margin:0 0 8px;font-size:17px;}
+  .lock-card p{margin:0;font-size:13px;color:var(--ink-3);line-height:1.8;}
+  .toast{position:fixed;left:50%;top:24px;transform:translateX(-50%);background:rgba(29,33,41,.92);color:#fff;padding:9px 16px;border-radius:6px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:200;}
+  .toast.show{opacity:1;}
+  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:100;}
+  .modal-mask.show{display:flex;}
+  .modal-box{position:relative;}
+  .modal{background:#fff;border-radius:8px;width:min(560px,94vw);max-height:86vh;overflow:auto;padding:22px;}
+  .modal h3{margin:0 0 12px;font-size:16px;}
+  .modal-close{position:absolute;top:-14px;right:-14px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border:none;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.18);font-size:20px;line-height:1;color:var(--ink-3);cursor:pointer;border-radius:6px;z-index:2;}
+
+  /* ===== 顶部常驻双盲提示条 ===== */
+  .blind-bar{flex:0 0 auto;background:var(--review-bg);border-bottom:1px solid var(--review-bd);color:var(--review-text);padding:9px 18px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;line-height:1.6;}
+  .blind-bar .bb-ico{font-size:14px;}
+
+  /* ===== 主体工作区 ===== */
+  .main-view{flex:1;display:flex;flex-direction:column;min-height:0;}
+  .workarea{flex:1;display:flex;flex-direction:column;min-height:0;background:var(--bg);}
+  .align-bar{flex:0 0 auto;background:#fff;border-bottom:1px solid var(--line);padding:9px 18px;font-size:12px;color:var(--ink-2);display:flex;gap:14px;flex-wrap:wrap;align-items:center;}
+  .align-bar b{color:var(--ink-1);}
+  .align-bar .ab-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink-2);}
+  .align-bar .ab-sep{color:var(--line);}
+
+  /* ===== 复用【页面5】合同比对视图组件：双栏原文排版（原样保留） ===== */
+  .view-bar{flex:0 0 auto;display:flex;align-items:center;gap:10px;background:#fff;border-bottom:1px solid var(--line);padding:6px 18px;}
+  .view-bar .vb-label{font-size:12px;color:var(--ink-3);}
+  .ctrl{display:flex;align-items:center;gap:6px;color:var(--ink-2);font-size:12px;}
+  .switch{position:relative;width:38px;height:20px;background:#C9CDD4;border-radius:12px;cursor:pointer;transition:background .15s;flex:0 0 38px;}
+  .switch.on{background:var(--brand);}
+  .switch::after{content:"";position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:2px;left:2px;transition:left .15s;}
+  .switch.on::after{left:20px;}
+  .panes{flex:1;display:flex;min-width:0;min-height:0;background:var(--bg);}
+  .panes.single .left-col{display:none;}
+  .panes.single .right-col{flex:1;}
+  .pane-col{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid var(--line);}
+  .pane-head{height:36px;flex:0 0 36px;display:flex;align-items:center;padding:0 14px;background:#fff;border-bottom:1px solid var(--line);font-weight:600;color:var(--ink-2);}
+  .ph-no{margin-left:auto;font-weight:400;font-size:12px;color:var(--ink-3);}
+  .pane{position:relative;flex:1;min-height:0;overflow:auto;padding:18px 22px;}
+  .article{margin-bottom:18px;}
+  .article h4{font-size:13px;color:var(--ink-1);margin:0 0 8px;padding-bottom:6px;border-bottom:1px dashed var(--line);}
+  .clause{line-height:1.9;color:var(--ink-1);margin:4px 0;}
+  /* 中性定位标记：仅指示「当前标注条款」，不含差异类型 / 风险语义 / 差异底色 */
+  .clause.focus-clause{border-left:3px solid var(--brand);padding-left:9px;margin-left:-12px;background:#F5F9FF;border-radius:0 4px 4px 0;}
+  /* 对齐匹配的标准条款原文（内容补充，沿用 .article 排版，不新增原文版式） */
+  .std-match{background:#F5F9FF;border:1px solid #BEDAFF;border-radius:4px;padding:8px 10px;margin:2px 0 8px;font-size:12px;line-height:1.7;color:var(--ink-2);}
+  .std-match .sm-t{color:var(--brand);font-weight:600;margin-bottom:2px;}
+  .std-match .sm-x{color:var(--ink-1);}
+
+  /* ===== 底部真值录入表单 ===== */
+  .truth-panel{flex:0 0 auto;max-height:400px;overflow:auto;background:#fff;border-top:1px solid var(--line);padding:12px 18px 14px;}
+  .tp-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+  .tp-head .tp-title{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;}
+  .tp-head .tp-title .line{width:3px;height:14px;background:var(--brand);border-radius:2px;}
+  .tp-head .spacer{flex:1;}
+  .tp-note{font-size:12px;color:var(--ink-3);}
+  .tp-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;}
+  @media(max-width:1000px){ .tp-grid{grid-template-columns:1fr;} }
+  .fld-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;}
+  .fld{flex:1;min-width:180px;}
+  .fld label{display:block;font-size:12px;color:var(--ink-2);margin-bottom:5px;font-weight:600;}
+  .fld label .req{color:var(--risk-high);margin-left:2px;}
+  .fld select,.fld textarea{border:1px solid var(--line);border-radius:4px;padding:7px 10px;font-size:13px;width:100%;font-family:inherit;background:#fff;color:var(--ink-1);}
+  .fld textarea{min-height:62px;resize:vertical;}
+  .fld select.req-empty{color:var(--ink-3);background:#FAFBFC;border-color:#C9CDD4;}
+  .fld select.req-error{border-color:var(--risk-high)!important;background:#FFF7F7!important;box-shadow:0 0 0 2px rgba(245,63,63,.12);}
+  .fld select:focus-visible,.fld textarea:focus-visible{outline:2px solid var(--brand);outline-offset:1px;}
+  .req-tip{display:none;color:var(--risk-high);font-size:12px;margin:6px 0 0;line-height:1.6;}
+  .req-tip.show{display:block;}
+  .tp-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;padding:10px 0 2px;border-top:1px dashed var(--line);position:sticky;bottom:0;background:#fff;z-index:3;box-shadow:0 -6px 10px -8px rgba(29,33,41,.18);}
+  .tp-actions .spacer{flex:1;}
+  .reviewer-pick{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-3);}
+  .reviewer-pick select{border:1px solid var(--line);border-radius:4px;padding:4px 7px;font-size:12px;background:#fff;color:var(--ink-1);}
+  .arb-box{border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:#FBFCFD;}
+  .arb-box .ab-t{font-size:12px;font-weight:700;color:var(--ink-2);margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+  .arb-row{border:1px solid var(--line);border-radius:4px;background:#fff;padding:8px 10px;margin-bottom:7px;font-size:12px;line-height:1.7;}
+  .arb-row .ar-h{font-weight:600;color:var(--ink-1);margin-bottom:3px;}
+  .arb-row .ar-n{color:var(--ink-2);}
+  .arb-empty{font-size:12px;color:var(--ink-3);line-height:1.7;}
+  .model-unlock{margin-top:10px;border:1px dashed var(--review-bd);border-radius:6px;padding:9px 11px;background:#FBF6FF;font-size:12px;color:var(--review-text);line-height:1.7;}
+  .model-unlock button{margin-top:6px;}
+  .model-body{margin-top:8px;border-top:1px dashed var(--review-bd);padding-top:8px;color:var(--ink-2);}
+  .model-body .mb-k{color:var(--ink-3);display:inline-block;min-width:74px;}
+  .isolation-note{font-size:11px;color:var(--ink-3);line-height:1.7;margin-top:8px;}
+  .done-banner{background:var(--brand-weak);border:1px solid #BEDAFF;border-radius:6px;padding:10px 12px;font-size:12px;color:var(--ink-2);line-height:1.8;}
+  .done-banner b{color:var(--brand);}
+  .success-line{font-size:13px;color:var(--ink-2);line-height:1.9;}
+  .countdown{font-size:12px;color:var(--ink-3);}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 侧边导航（全站统一） -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-brand"><div class="logo">C</div><span>合同对比助手</span></div>
+    <div class="sb-nav" id="sbNav">
+      <div class="sb-group" data-group="ledger">
+        <div class="sb-item sb-parent" data-nav="ledger"><span class="ico">▤</span><span>合同台账</span><span class="sb-caret">▸</span></div>
+        <div class="sb-children"><div class="sb-sub" data-nav="detail"><span class="ico">›</span><span>合同详情</span></div></div>
+      </div>
+      <div class="sb-group" data-group="tasks">
+        <div class="sb-item sb-parent" data-nav="tasks"><span class="ico">☰</span><span>比对任务管理</span><span class="sb-caret">▸</span></div>
+        <div class="sb-children">
+          <div class="sb-sub" data-nav="new"><span class="ico">＋</span><span>新建比对任务</span></div>
+          <div class="sb-sub" data-nav="review"><span class="ico">✎</span><span>对比复核页</span></div>
+        </div>
+      </div>
+      <div class="sb-group" data-group="std">
+        <div class="sb-item sb-parent" data-nav="std"><span class="ico">📘</span><span>标准条款库</span><span class="sb-caret">▸</span></div>
+        <div class="sb-children"><div class="sb-sub" data-nav="clauseDetail"><span class="ico">›</span><span>条款详情&amp;版本对比</span></div></div>
+      </div>
+      <div class="sb-item" data-nav="risk"><span class="ico">⚠</span><span>风险条款库</span></div>
+      <div class="sb-item" data-nav="eval"><span class="ico">📊</span><span>评测集管理</span></div>
+      <div class="sb-item active" data-nav="qc"><span class="ico">✓</span><span>双盲审核工单</span></div>
+      <div class="sb-item" data-nav="rule"><span class="ico">⚙</span><span>风控规则配置</span></div>
+      <div class="sb-group" data-group="archive">
+        <div class="sb-item sb-parent" data-nav="archive"><span class="ico">🗄</span><span>复核报告归档</span><span class="sb-caret">▸</span></div>
+        <div class="sb-children"><div class="sb-sub" data-nav="reportDetail"><span class="ico">›</span><span>复核报告详情</span></div></div>
+      </div>
+      <div class="sb-item sb-admin-only" data-nav="setting" style="display:none;"><span class="ico">⚷</span><span>系统权限设置</span></div>
+    </div>
+    <div class="sb-foot">一期 规则引擎+差异模型<br>二期 样本相似度+难例挖掘<br>无大模型自动解读</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="icon-btn" id="sbToggle" title="收起/展开侧边栏">☰</button>
+      <button class="icon-btn" id="backBtn" title="返回上一页" onclick="history.back()">‹</button>
+      <div>
+        <h1>双盲真值复核工单详情</h1>
+        <div class="crumb">合同对比助手 / 双盲审核工单 / 真值录入（二期 · 独立评测工单体系）</div>
+      </div>
+      <div class="top-right">
+        <span class="lock-note" id="permHint"></span>
+        <label class="lock-note" for="evalRoleSel">评测角色</label>
+        <select class="role-sel" id="evalRoleSel">
+          <option value="annotator">评测审核员</option>
+          <option value="arbitrator">评测仲裁管理员</option>
+          <option value="legal">法务审核员（无权限）</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 法务角色：业务复核链路与评测工单体系隔离，整页锁屏 -->
+    <div class="lock-screen">
+      <div class="lock-card">
+        <div class="lock-ico">🔒</div>
+        <h2>法务角色无访问权限</h2>
+        <p>双盲真值复核工单属于<strong>二期模型评测链路</strong>，与法务业务复核工单为两套独立工单体系。<br>法务角色不可查看双盲工单列表，也无法进入真值录入页面。<br>请切换为评测审核员或评测仲裁管理员。</p>
+      </div>
+    </div>
+
+    <div class="main-view">
+      <!-- 1. 顶部常驻提示条 -->
+      <div class="blind-bar" id="blindBar"><span class="bb-ico">◈</span>提示：当前为双盲评测模式，不展示模型预判结果，请独立判断录入真值</div>
+
+      <div class="workarea">
+        <!-- 对齐信息条：仅样本 / 标准条款 / 合同标识，无任何初判信息 -->
+        <div class="align-bar" id="alignBar"></div>
+
+        <!-- 2. 主体比对区：复用页面5 双栏原文排版组件，不渲染差异清单 / 差异底色 / 判定板块 -->
+        <div class="view-bar">
+          <span class="vb-label">比对视图</span>
+          <div class="seg" id="viewSeg">
+            <button class="on" data-view="dual">双栏对照</button>
+            <button data-view="single">单栏原文</button>
+          </div>
+          <div class="ctrl" style="margin-left:6px;">
+            <span>同步滚动</span>
+            <div class="switch on" id="syncSwitch" title="同步滚动开关"></div>
+          </div>
+          <span class="vb-label" style="margin-left:auto;">仅展示合同原文与对齐匹配的标准条款原文</span>
+        </div>
+        <div class="panes" id="panes">
+          <div class="pane-col left-col">
+            <div class="pane-head">基准标准合同（甲方模板）· 标准条款原文<span class="ph-no">合同编号：HT-STD-2026-001</span></div>
+            <div class="pane" id="leftPane"></div>
+          </div>
+          <div class="pane-col right-col">
+            <div class="pane-head">供应商待审合同原文<span class="ph-no" id="rightCode">合同编号：HT-SUP-2026-001</span></div>
+            <div class="pane" id="rightPane"></div>
+          </div>
+        </div>
+
+        <!-- 3. 底部真值录入表单 -->
+        <div class="truth-panel" id="truthPanel"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 提交结果 / 自动跳转 -->
+<div class="modal-mask" id="resultMask">
+  <div class="modal-box">
+    <div class="modal" id="resultBody"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ==========================================================================
+   双盲真值复核工单详情（页面14）
+   - 独立工单体系：与【页面5】法务业务复核工单完全隔离，独立 key / 独立状态机
+   - 入口仅来自【页面10】评测集样本表格 /【页面11】双盲审核工单列表
+   - 存储策略：内存权威 + localStorage 尽力持久化 + URL 参数兜底
+     （预览容器可能拒绝 localStorage，存储不可用时本页与链路仍完整可用）
+   ========================================================================== */
+
+const NAV = {
+  ledger:{url:'page1.html'},
+  tasks:{url:'page3.html'},
+  new:{url:'page4.html'},
+  std:{url:'page6.html'},
+  risk:{url:'page9.html'},
+  eval:{url:'page10.html'},
+  qc:{url:'page11.html'},
+  rule:{url:'page12.html'},
+  archive:{url:'page13.html'},
+  detail:{url:'page2.html'},
+  review:{url:'page5.html'},
+  clauseDetail:{url:'page7.html'},
+  reportDetail:{url:'page8.html'},
+  setting:{}
+};
+
+const ST_LABEL={add:'新增',del:'删除',mod:'修改',same:'一致'};
+const RISK_VALUES=['高','中','低','无风险'];
+const RISK_TO_CODE={'高':'high','中':'mid','低':'low','无风险':'none'};
+const WO_STATUS={pending:'待复核',arb:'待仲裁',done:'复核完成'};
+const WO_STATUS_TAG={pending:'t-pending',arb:'t-arb',done:'t-done'};
+const EVAL_ROLE_LABEL={
+  annotator:'评测审核员（独立标注 · 全程不可见模型初判）',
+  arbitrator:'评测仲裁管理员（可查看多方标注 · 提交后解锁模型预判）',
+  legal:'法务审核员（业务链路 · 无访问权限）'
+};
+
+/* ===== 标准条款字典（来自【页面6】标准条款库，仅条款原文，不含风险 / 规则 / 判定依据） ===== */
+const STD_CLAUSES = {
+  'CL-001':{title:'付款账期与结算条款', text:'账期≤60日，逾期违约金按日万分之五。'},
+  'CL-002':{title:'质量标准与验收条款', text:'到货 7 日内完成验收，质保期≥12 月。'},
+  'CL-003':{title:'违约责任与赔偿上限', text:'赔偿上限不超过合同总额 20%。'},
+  'CL-004':{title:'采购订单数量浮动', text:'±10% 数量浮动免违约责任。'},
+  'CL-005':{title:'供应商准入资质', text:'需具备 ISO9001 及安全生产许可。'},
+  'CL-006':{title:'保密与竞业限制', text:'保密期 3 年，竞业 1 年。'},
+  'CL-008':{title:'交付地点与运费承担', text:'供方承担至买方仓库运费。'},
+  'CL-009':{title:'知识产权归属', text:'定制化成果归采购方所有。'},
+  'CL-010':{title:'不可抗力与合同解除', text:'旧版解除条件偏宽松，需按现行模板复核。'}
+};
+
+/* ===== 工单创建时冻结的「模型初判快照」=====
+   后台配对使用，页面在任何标注阶段都不渲染；仅评测仲裁管理员提交真值后才可解锁查看。 */
+const MODEL_SNAPSHOTS = {
+  d1:{type:'mod',risk:'高',   ruleNo:'R-Pay-07',  basis:'规则 R-Pay-07：付款账期偏离基准模板（>30日）触发高风险命中。'},
+  d2:{type:'mod',risk:'中',   ruleNo:'R-Q-03',    basis:'规则 R-Q-03：质量标准由国标变更为国际标准，需确认等效性。'},
+  d3:{type:'mod',risk:'高',   ruleNo:'R-Pen-02',  basis:'规则 R-Pen-02：违约金上限>10% 触发高风险，需评估赔付敞口。'},
+  d4:{type:'del',risk:'中',   ruleNo:'R-Sec-01',  basis:'规则 R-Sec-01：基准合同含保密义务，待审合同缺失该条款。'},
+  d5:{type:'add',risk:'中',   ruleNo:'R-IP-01',   basis:'规则 R-IP-01：待审合同新增改进技术权属条款，基准合同未约定。'},
+  d6:{type:'mod',risk:'低',   ruleNo:'R-Del-01',  basis:'规则 R-Del-01：交付地点由甲方仓库变更为乙方工厂。'},
+  d7:{type:'mod',risk:'中',   ruleNo:'R-Acc-01/02',basis:'验收期规则部分命中且结论冲突，系统无法稳定定级。'},
+  d8:{type:'mod',risk:'高',   ruleNo:'R-Disp-01', basis:'规则 R-Disp-01：争议解决由仲裁变更为诉讼，改变救济路径。'},
+  d9:{type:'mod',risk:'中',   ruleNo:'R-FM-01',   basis:'不可抗力定义文本语义模糊，规则命中冲突。'}
+};
+
+/* ===== 独立真值复核工单（seed）===== */
+const WO_KEY='CLM_TRUTH_WO_V1';
+const RESULT_KEY='CLM_TRUTH_RESULT_V1';
+const WO_SEED=[
+  {id:'TW-2026-001', sampleId:'EV-001', riskSampleId:'RS-001', stdClause:'CL-001',
+   clause:'3.2 付款账期', diff:'d1', contract:'HT-SUP-2026-001', status:'pending',
+   annotations:[], draft:null, truth:null, createdAt:'2026-11-05 09:12'},
+  {id:'TW-2026-002', sampleId:'EV-004', riskSampleId:'RS-006', stdClause:'CL-009',
+   clause:'6.1 保密义务', diff:'d4', contract:'HT-SUP-2026-002', status:'pending',
+   annotations:[{reviewer:'评测审核员 A',type:'del',risk:'中',note:'待审合同未列明保密条款，按删除处理',time:'2026-11-06 10:20'}],
+   draft:null, truth:null, createdAt:'2026-11-05 09:30'},
+  {id:'TW-2026-003', sampleId:'EV-005', riskSampleId:'RS-008', stdClause:'CL-004',
+   clause:'7.2 交付地点', diff:'d6', contract:'HT-SUP-2026-001', status:'arb',
+   annotations:[{reviewer:'评测审核员 A',type:'mod',risk:'高',note:'交付地变更影响物流成本与责任边界',time:'2026-11-06 11:05'},
+                {reviewer:'评测审核员 B',type:'same',risk:'无风险',note:'与标准模板一致，无实质差异',time:'2026-11-06 11:32'}],
+   draft:null, truth:null, createdAt:'2026-11-05 10:05'},
+  {id:'TW-2026-004', sampleId:'EV-008', riskSampleId:'RS-004', stdClause:'CL-010',
+   clause:'10.2 争议管辖', diff:'d8', contract:'HT-SUP-2026-001', status:'done',
+   annotations:[{reviewer:'评测审核员 A',type:'mod',risk:'高',note:'救济路径由仲裁改为诉讼',time:'2026-11-06 14:02'}],
+   truth:{type:'mod',risk:'高',note:'争议解决由仲裁改为诉讼',source:'单人真值'},
+   draft:null, createdAt:'2026-11-05 10:40'}
+];
+WO_SEED.forEach(w=>{ w.modelSnapshot=MODEL_SNAPSHOTS[w.diff]||MODEL_SNAPSHOTS.d1; });
+
+/* ===== 合同原文数据：与【页面5】ARTICLES 一致，仅把差异 ID 改名为对齐引用 ref ===== */
+const ARTICLES = [
+  {title:'第一条 标的与供货范围', rows:[
+    {l:'1.1 乙方向甲方供应工业机器人本体及配套控制系统，型号见附件一《供货清单》。', r:'1.1 乙方向甲方供应工业机器人本体及配套控制系统，型号见附件一《供货清单》。'},
+    {l:'1.2 甲方有权在交付前对关键部件进行现场监造。', r:'1.2 甲方有权在交付前对关键部件进行现场监造。'}
+  ]},
+  {title:'第四章 交付与验收', rows:[
+    {l:'4.1 交付地点：甲方指定仓库（上海）。', r:'4.1 交付地点：乙方工厂（苏州）。', ref:'d6'},
+    {l:'4.3 甲方应于到货后 7 日内完成验收。', r:'4.3 甲方应于到货后 15 日内完成验收。', ref:'d7'},
+    {l:'4.4 逾期未验收且未提出书面异议的，视为验收合格。', r:'4.4 逾期未验收且未提出书面异议的，视为验收合格。'}
+  ]},
+  {title:'第五章 价款与支付', rows:[
+    {l:'5.1 合同总价以人民币计价，含 13% 增值税。', r:'5.1 合同总价以人民币计价，含 13% 增值税。'},
+    {l:'5.2 甲方应于收到合规发票后 30 日内支付相应款项。', r:'5.2 甲方应于收到合规发票后 60 日内支付相应款项。', ref:'d1'}
+  ]},
+  {title:'第六章 质量保证', rows:[
+    {l:'6.1 货物质量应符合 GB/T 19001 质量管理体系要求。', r:'6.1 货物质量应符合 ISO 9001 质量管理体系要求。', ref:'d2'}
+  ]},
+  {title:'第八章 违约责任', rows:[
+    {l:'8.3 任何一方违约，违约金不超过合同总额的 5%。', r:'8.3 任何一方违约，违约金不超过合同总额的 15%。', ref:'d3'}
+  ]},
+  {title:'第九章 保密', rows:[
+    {l:'9.1 双方对在履约中获知的对方商业秘密负有保密义务，保密期限自合同生效起 3 年。', r:'[待审合同未列明保密条款]', ref:'d4'}
+  ]},
+  {title:'第十章 知识产权', rows:[
+    {l:'[基准合同未约定改进技术权属]', r:'10.2 乙方保留履行本合同过程中产生的改进技术所有权。', ref:'d5'}
+  ]},
+  {title:'第十一章 争议解决', rows:[
+    {l:'11.1 因本合同发生的争议，提交北京仲裁委员会仲裁。', r:'11.1 因本合同发生的争议，提交乙方所在地有管辖权的人民法院诉讼。', ref:'d8'}
+  ]},
+  {title:'第十二章 不可抗力', rows:[
+    {l:'12.1 不可抗力包括自然灾害、战争等不能预见、不能避免并不能克服的客观情况。', r:'12.1 不可抗力包括自然灾害、流行病及政府管制等客观情况。', ref:'d9'}
+  ]}
+];
+
+/* ===== 存储层：内存权威，localStorage 尽力持久化 ===== */
+let _woCache=null, _resultCache=null;
+function safeRead(key){ try{ const raw=localStorage.getItem(key); return raw?JSON.parse(raw):null; }catch(e){ return null; } }
+function safeWrite(key,val){ try{ localStorage.setItem(key,JSON.stringify(val)); }catch(e){} }
+function allWOs(){
+  if(!_woCache){
+    const saved=safeRead(WO_KEY);
+    const base=WO_SEED.map(w=>JSON.parse(JSON.stringify(w)));
+    if(Array.isArray(saved)) saved.forEach(s=>{
+      const i=base.findIndex(w=>w.id===s.id);
+      if(i>=0) base[i]=Object.assign(base[i],s); else base.push(s);
+    });
+    _woCache=base;
+  }
+  return _woCache;
+}
+function allResults(){
+  if(!_resultCache){ const a=safeRead(RESULT_KEY); _resultCache=Array.isArray(a)?a:[]; }
+  return _resultCache;
+}
+function persist(){ safeWrite(WO_KEY,allWOs()); safeWrite(RESULT_KEY,allResults()); }
+
+/* ===== 状态 ===== */
+const state = {
+  role:'legal', evalRole:'annotator', from:'qc', woId:'', reviewer:'A',
+  view:'dual', sync:true, submitted:false, redirectUrl:'',
+  form:{type:'',risk:'',note:''}, reqError:{}, reqMsg:'', modelOpen:false
+};
+function nowStr(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2000); }
+function go(url){ return url + (url.indexOf('?')>-1?'&':'?') + 'role=' + encodeURIComponent(state.role); }
+function currentWO(){ return allWOs().find(w=>w.id===state.woId) || allWOs()[0]; }
+function reviewerName(){ return state.evalRole==='arbitrator' ? '评测仲裁管理员' : ('评测审核员 '+state.reviewer); }
+function isArbWO(w){ return w.status==='arb'; }
+function canSubmit(w){
+  if(state.evalRole==='legal') return false;
+  if(w.status==='done') return false;
+  if(isArbWO(w) && state.evalRole!=='arbitrator') return false;   // 待仲裁仅评测负责人可裁定
+  return true;
+}
+
+/* ===== 从入口参数解析 / 创建工单 ===== */
+function ensureWorkOrder(p){
+  const wos=allWOs();
+  let w = p.get('woId') ? wos.find(x=>x.id===p.get('woId')) : null;
+  if(w) return w;
+  const sampleId=p.get('sampleId')||'';
+  w = sampleId ? wos.find(x=>x.sampleId===sampleId) : null;
+  if(w) return w;
+  // 入口1 新样本：按创建时冻结的模型初判快照建立独立工单（快照不参与页面渲染）
+  const diff=p.get('diff')||'d1';
+  const id='TW-2026-'+String(900+wos.length).slice(-3);
+  w={id, sampleId:sampleId||('EV-'+id.slice(-3)), riskSampleId:p.get('rs')||'RS-001',
+     stdClause:p.get('std')||'CL-001', clause:p.get('clause')||'3.2 付款账期', diff,
+     contract:p.get('contract')||'HT-SUP-2026-001', status:'pending',
+     annotations:[], draft:null, truth:null, createdAt:nowStr(),
+     modelSnapshot:MODEL_SNAPSHOTS[diff]||MODEL_SNAPSHOTS.d1};
+  wos.push(w); persist();
+  return w;
+}
+
+/* ===== 渲染：对齐信息条 ===== */
+function renderAlignBar(w){
+  const std=STD_CLAUSES[w.stdClause]||{title:'标准条款',text:'按基准模板执行。'};
+  document.getElementById('alignBar').innerHTML=
+    '<span>真值工单 <b class="ab-code">'+esc(w.id)+'</b></span><span class="ab-sep">|</span>'+
+    '<span>评测样本 <b class="ab-code">'+esc(w.sampleId)+'</b></span><span class="ab-sep">|</span>'+
+    '<span>风险样本 <b class="ab-code">'+esc(w.riskSampleId)+'</b>（已启用入库样本）</span><span class="ab-sep">|</span>'+
+    '<span>对齐匹配标准条款 <b>'+esc(w.stdClause)+' '+esc(std.title)+'</b></span><span class="ab-sep">|</span>'+
+    '<span>来源合同 <span class="ab-code">'+esc(w.contract)+'</span></span>';
+  document.getElementById('rightCode').textContent='合同编号：'+w.contract;
+}
+
+/* ===== 渲染：复用页面5 双栏原文排版（仅纯文本 + 中性定位 + 标准条款对齐块） ===== */
+function stdMatchHtml(w){
+  const std=STD_CLAUSES[w.stdClause]||{title:'标准条款',text:'按基准模板执行。'};
+  return '<div class="std-match"><div class="sm-t">↳ 对齐匹配标准条款 · '+esc(w.stdClause)+' '+esc(std.title)+'</div>'+
+    '<div class="sm-x">'+esc(std.text)+'</div></div>';
+}
+function renderPane(side,w){
+  return ARTICLES.map(a=>{
+    const isTarget=a.rows.some(r=>r.ref===w.diff);
+    const lines=a.rows.map(r=>{
+      const txt=side==='l'?r.l:r.r;
+      const focus=r.ref===w.diff?' class="clause focus-clause" data-focus-clause="1"':' class="clause"';
+      return '<div'+focus+'>'+esc(txt)+'</div>';
+    }).join('');
+    const std=(side==='l'&&isTarget)?stdMatchHtml(w):'';
+    return '<section class="article"><h4>'+esc(a.title)+'</h4>'+std+lines+'</section>';
+  }).join('');
+}
+function renderPanes(w){
+  document.getElementById('leftPane').innerHTML=renderPane('l',w);
+  document.getElementById('rightPane').innerHTML=renderPane('r',w);
+  // 定位到当前标注条款（中性滚动，不产生任何差异高亮）
+  requestAnimationFrame(()=>{
+    // 两栏使用同一个目标值定位到「目标章节容器」，保证章节标题与对齐标准条款块完整可见且上下对齐
+    const lp=document.getElementById('leftPane'), rp=document.getElementById('rightPane');
+    const t=lp.querySelector('[data-focus-clause]');
+    if(!t) return;
+    const target=Math.max(0,(t.closest('.article')||t).offsetTop-8);
+    lp.scrollTop=target; rp.scrollTop=target;
+  });
+}
+function bindSyncScroll(){
+  const lp=document.getElementById('leftPane'), rp=document.getElementById('rightPane');
+  let lock=false;
+  function pair(from,to){
+    from.addEventListener('scroll',()=>{
+      if(!state.sync||lock) return;
+      lock=true;
+      // 按像素同步：两栏逐行对照，避免因两栏总高不同（左栏多标准条款块）产生章节错位
+      to.scrollTop=from.scrollTop;
+      requestAnimationFrame(()=>{lock=false;});
+    });
+  }
+  pair(lp,rp); pair(rp,lp);
+}
+
+/* ===== 渲染：底部真值录入表单 ===== */
+function optType(v){ return '<option value=""'+(v?'':' selected')+' disabled>请选择真实差异类型</option>'+
+  Object.keys(ST_LABEL).map(k=>'<option value="'+k+'"'+(v===k?' selected':'')+'>'+ST_LABEL[k]+'</option>').join(''); }
+function optRisk(v){ return '<option value=""'+(v?'':' selected')+' disabled>请选择真实风险等级</option>'+
+  RISK_VALUES.map(k=>'<option value="'+k+'"'+(v===k?' selected':'')+'>'+k+'</option>').join(''); }
+
+function arbRecordsHtml(w){
+  if(state.evalRole!=='arbitrator'){
+    return '<div class="arb-box"><div class="ab-t">⚖ 争议仲裁</div>'+
+      '<div class="arb-empty">该工单因多人标注结果不一致已进入【待仲裁】。多方标注记录与最终仲裁真值仅评测仲裁管理员可见，请切换角色处理。</div></div>';
+  }
+  const rows=w.annotations.length? w.annotations.map((a,i)=>
+    '<div class="arb-row"><div class="ar-h">标注 '+(i+1)+' · '+esc(a.reviewer)+' ｜ '+ST_LABEL[a.type]+' / '+esc(a.risk)+'</div>'+
+    '<div class="ar-n">'+(esc(a.note)||'（未填写备注）')+'</div>'+
+    '<div class="ar-n" style="color:var(--ink-3);margin-top:2px;">'+esc(a.time||'')+'</div></div>').join('')
+    : '<div class="arb-empty">暂无多方标注记录。</div>';
+  return '<div class="arb-box"><div class="ab-t">⚖ 多方标注记录（仅评测仲裁管理员可见）</div>'+rows+
+    '<div class="isolation-note">请在右侧录入最终仲裁真值，作为该样本的最终真值；仲裁结论仅回写评测集样本，不修改风险条款库业务样本。</div></div>';
+}
+
+function doneHtml(w){
+  const t=w.truth||{};
+  return '<div class="done-banner"><b>✓ 工单状态：复核完成</b> · 最终真值 '+
+    (t.type?ST_LABEL[t.type]:'—')+' / '+esc(t.risk||'—')+'（'+(t.source==='负责人仲裁'?'负责人仲裁':'人工标注')+'）。<br>'+
+    '真值已回写评测集样本 <b>'+esc(w.sampleId)+'</b> 并标记【已标注真值】，用于自动计算准确率、召回率；'+
+    '风险条款库业务样本内容不做任何反向修改。</div>';
+}
+
+function modelUnlockHtml(w){
+  // 仅评测仲裁管理员、且提交真值之后才渲染解锁入口；模型预判内容点击后才注入 DOM
+  if(state.evalRole!=='arbitrator'||!state.submitted||w.status!=='done') return '';
+  const ms=w.modelSnapshot||{};
+  const body = state.modelOpen
+    ? '<div class="model-body" id="modelBody">'+
+        '<div><span class="mb-k">初判差异</span>'+ST_LABEL[ms.type]+'（'+esc(ms.type)+'）</div>'+
+        '<div><span class="mb-k">初判风险</span>'+esc(ms.risk)+'</div>'+
+        '<div><span class="mb-k">规则编号</span><span class="code">'+esc(ms.ruleNo)+'</span></div>'+
+        '<div><span class="mb-k">判定依据</span>'+esc(ms.basis)+'</div>'+
+        '<div><span class="mb-k">快照时间</span>'+esc(w.createdAt||'工单创建时')+'</div></div>'
+    : '';
+  return '<div class="model-unlock">🔓 原始模型预判（提交真值后解锁 · 仅评测仲裁管理员可见）'+
+    '<br><button class="btn btn-sm" id="modelToggle">'+(state.modelOpen?'收起原始模型预判':'查看原始模型预判')+'</button>'+body+'</div>';
+}
+
+function renderTruthPanel(){
+  const w=currentWO(), el=document.getElementById('truthPanel');
+  const editable=canSubmit(w)&&!state.submitted;
+  const disabled=editable?'':' disabled';
+  const title = isArbWO(w) ? '最终仲裁真值录入' : '真值录入';
+  const statusTag='<span class="tag '+WO_STATUS_TAG[w.status]+'">'+WO_STATUS[w.status]+'</span>';
+  let left='';
+  if(state.submitted&&w.status==='done') left=doneHtml(w)+modelUnlockHtml(w);
+  else if(state.submitted&&w.status==='arb') left='<div class="done-banner"><b>⚖ 工单状态：待仲裁</b> · 多人标注结果不一致，工单已自动转为【待仲裁】，待评测仲裁管理员录入最终仲裁真值。</div>';
+  else if(w.status==='done') left=doneHtml(w);
+  else if(!canSubmit(w)){
+    left='<div class="done-banner">'+(state.evalRole==='legal'
+      ? '当前角色为法务业务链路角色，无真值录入权限。'
+      : isArbWO(w) ? '该工单已进入【待仲裁】，仅评测仲裁管理员可录入最终仲裁真值。'
+      : '该工单已完成真值标注，不可重复提交。')+'</div>';
+  } else {
+    const draftHint=w.draft?'<span class="tp-note">已恢复上次暂存内容</span>':'';
+    left=
+      '<div class="fld-row">'+
+        '<div class="fld"><label for="truthType">真实差异类型<span class="req">*</span></label>'+
+          '<select id="truthType" class="'+(state.form.type?'':'req-empty')+(state.reqError.type?' req-error':'')+'" aria-required="true"'+disabled+'>'+optType(state.form.type)+'</select></div>'+
+        '<div class="fld"><label for="truthRisk">真实风险等级<span class="req">*</span></label>'+
+          '<select id="truthRisk" class="'+(state.form.risk?'':'req-empty')+(state.reqError.risk?' req-error':'')+'" aria-required="true"'+disabled+'>'+optRisk(state.form.risk)+'</select></div>'+
+      '</div>'+
+      '<div class="fld" style="margin-top:10px;"><label for="truthNote">备注（选填）</label>'+
+        '<textarea id="truthNote" placeholder="填写标注理由、争议说明"'+disabled+'>'+esc(state.form.note)+'</textarea></div>'+
+      '<div class="req-tip'+(state.reqMsg?' show':'')+'" id="reqTip">'+esc(state.reqMsg)+'</div>'+
+      '<div class="isolation-note">真值仅用于模型评测标注，不回写风险条款库业务样本内容；评测标签与业务库相互隔离。</div>'+draftHint;
+  }
+
+  const reviewerPick = (state.evalRole==='annotator'&&!state.submitted)
+    ? '<span class="reviewer-pick">演示切换标注人 <select id="reviewerSel">'+
+        '<option value="A"'+(state.reviewer==='A'?' selected':'')+'>评测审核员 A</option>'+
+        '<option value="B"'+(state.reviewer==='B'?' selected':'')+'>评测审核员 B</option></select></span>'
+    : '';
+
+  el.innerHTML=
+    '<div class="tp-head"><div class="tp-title"><span class="line"></span>'+title+'</div>'+statusTag+
+      '<span class="tp-note">工单 '+esc(w.id)+' · '+esc(w.clause)+'</span><div class="spacer"></div>'+reviewerPick+'</div>'+
+    '<div class="tp-grid"><div>'+left+'</div><div>'+
+      (isArbWO(w)||w.annotations.length>1 ? arbRecordsHtml(w)
+        : '<div class="arb-box"><div class="ab-t">◈ 双盲遮蔽说明</div><div class="arb-empty">'+
+          '本工单仅展示合同原文与对齐匹配的标准条款原文，系统预判相关内容已全部屏蔽，且不提供任何切换开关。<br>'+
+          '请仅依据原文独立判断并录入真值，标注全程不展示任何既有判定结论或业务复核意见。<br>'+
+          (w.annotations.length? '已有 '+w.annotations.length+' 方标注；同一样本多人标注结果不一致时，工单将自动转为【待仲裁】。':'')+
+          '</div></div>')+
+    '</div></div>'+
+    '<div class="tp-actions">'+
+      '<button class="btn btn-primary" id="submitBtn"'+disabled+'>'+(isArbWO(w)?'提交仲裁真值':'提交真值')+'</button>'+
+      '<button class="btn" id="draftBtn"'+disabled+'>暂存</button>'+
+      '<button class="btn" id="returnBtn">返回</button>'+   // 恢复路径始终可用，不随提交禁用
+      '<div class="spacer"></div>'+
+      '<span class="tp-note">提交后工单状态变为【复核完成】并自动返回双盲审核工单列表</span>'+
+    '</div>';
+
+  bindTruthPanel();
+}
+
+function bindTruthPanel(){
+  const t=document.getElementById('truthType'), r=document.getElementById('truthRisk'), n=document.getElementById('truthNote');
+  if(t) t.addEventListener('change',e=>{ state.form.type=e.target.value; state.reqError.type=false; e.target.classList.remove('req-empty','req-error'); if(!state.form.risk){} else clearReqMsg(); });
+  if(r) r.addEventListener('change',e=>{ state.form.risk=e.target.value; state.reqError.risk=false; e.target.classList.remove('req-empty','req-error'); if(state.form.type) clearReqMsg(); });
+  if(n) n.addEventListener('input',e=>{ state.form.note=e.target.value; });
+  const rs=document.getElementById('reviewerSel');
+  if(rs) rs.addEventListener('change',e=>{ state.reviewer=e.target.value; toast('已切换为评测审核员 '+state.reviewer+'（演示多人独立标注）'); });
+  const sb=document.getElementById('submitBtn'); if(sb) sb.addEventListener('click',submitTruth);
+  const db=document.getElementById('draftBtn'); if(db) db.addEventListener('click',saveDraft);
+  const rb=document.getElementById('returnBtn'); if(rb) rb.addEventListener('click',backToList);
+  const mt=document.getElementById('modelToggle');
+  if(mt) mt.addEventListener('click',()=>{ state.modelOpen=!state.modelOpen; renderTruthPanel(); });
+}
+function clearReqMsg(){ state.reqMsg=''; const tip=document.getElementById('reqTip'); if(tip){ tip.classList.remove('show'); tip.textContent=''; } }
+
+/* ===== 操作：必填校验 / 暂存 / 提交 / 返回 ===== */
+function checkRequired(){
+  const miss=[];
+  if(!state.form.type) miss.push({f:'type',n:'真实差异类型'});
+  if(!state.form.risk) miss.push({f:'risk',n:'真实风险等级'});
+  state.reqError={type:!state.form.type,risk:!state.form.risk};
+  if(!miss.length){ state.reqMsg=''; return true; }
+  state.reqMsg='请先选择：'+miss.map(m=>m.n).join('、')+'（均为必填）';
+  renderTruthPanel();
+  const first=document.getElementById(miss[0].f==='type'?'truthType':'truthRisk');
+  if(first&&!first.disabled) first.focus();
+  toast(state.reqMsg);
+  return false;
+}
+function saveDraft(){
+  const w=currentWO();
+  w.draft={type:state.form.type,risk:state.form.risk,note:state.form.note,time:nowStr()};
+  w.status=w.status==='done'?'done':'pending';   // 暂存保持【待复核】，可后续继续编辑
+  persist();
+  toast('已暂存真值草稿，工单保持【待复核】，可后续继续编辑');
+  renderTruthPanel();
+}
+function submitTruth(){
+  const w=currentWO();
+  if(!canSubmit(w)){ toast('当前角色或工单状态不允许提交真值'); return; }
+  if(!checkRequired()) return;
+  state.reqMsg=''; state.reqError={};
+  const rec={type:state.form.type,risk:state.form.risk,note:state.form.note,time:nowStr()};
+
+  if(isArbWO(w)){
+    // 评测负责人录入最终仲裁真值，作为样本最终真值
+    w.truth={type:rec.type,risk:rec.risk,note:rec.note,source:'负责人仲裁',by:reviewerName(),time:rec.time};
+    w.status='done';
+  } else {
+    const me=reviewerName();
+    w.annotations=w.annotations.filter(a=>a.reviewer!==me);
+    w.annotations.push({reviewer:me,type:rec.type,risk:rec.risk,note:rec.note,time:rec.time});
+    const others=w.annotations.filter(a=>a.reviewer!==me);
+    const conflict=others.some(a=>a.type!==rec.type||a.risk!==rec.risk);
+    if(conflict){
+      w.status='arb';   // 同一样本多人标注不一致 → 自动待仲裁
+      w.truth=null;
+    } else {
+      w.status='done';
+      w.truth={type:rec.type,risk:rec.risk,note:rec.note,source:others.length?'双人一致':'单人真值',by:me,time:rec.time};
+    }
+  }
+  if(w.status==='done') writeTruthResult(w);   // 真值与创建时快照配对 → 回写评测集
+  w.draft=null;
+  persist();
+  state.submitted=true;
+  renderTruthPanel();
+  showResult(w);
+}
+
+/* ===== 提交后的数据联动：人工真值 × 创建时模型初判快照 → 回写评测集样本 ===== */
+function writeTruthResult(w){
+  const ms=w.modelSnapshot||{}, t=w.truth||{};
+  const rec={
+    woId:w.id, sampleId:w.sampleId, riskSampleId:w.riskSampleId,
+    stdClause:w.stdClause, clause:w.clause, diff:w.diff,
+    truth:{type:t.type,risk:t.risk,riskCode:RISK_TO_CODE[t.risk]||'none',note:t.note||''},
+    modelSnapshot:{type:ms.type||'mod',risk:ms.risk||'中',riskCode:RISK_TO_CODE[ms.risk]||'mid',ruleNo:ms.ruleNo||'',basis:ms.basis||''},
+    pairedAt:nowStr(), source:t.source||'单人真值', final:true,
+    scope:'eval-only'   // 明确作用域：仅回写评测集样本，不反向修改风险条款库业务样本
+  };
+  const list=allResults();
+  const i=list.findIndex(x=>x.woId===w.id);
+  if(i<0) list.push(rec); else list[i]=rec;
+  _resultCache=list;
+  safeWrite(RESULT_KEY,list);
+}
+
+/* ===== 提交结果弹窗 + 自动返回工单列表 ===== */
+function showResult(w){
+  const isDone=w.status==='done';
+  const head=isDone?'✓ 真值已提交':'⚖ 标注已提交，工单转入待仲裁';
+  let html='<h3>'+head+'</h3><div class="success-line">';
+  html+='<div>工单 <b>'+esc(w.id)+'</b> 状态：<span class="tag '+WO_STATUS_TAG[w.status]+'">'+WO_STATUS[w.status]+'</span></div>';
+  if(isDone){
+    html+='<div>真实差异类型：<b>'+ST_LABEL[w.truth.type]+'</b> ｜ 真实风险等级：<b>'+esc(w.truth.risk)+'</b>（'+esc(w.truth.source||'')+'）</div>'+
+      '<div>后台已将本次人工真值与工单创建时冻结的模型初判快照配对，回写评测集样本 <b>'+esc(w.sampleId)+'</b>，标记【已标注真值】，驱动准确率、召回率自动重算。</div>'+
+      '<div style="color:var(--ink-3);">仅回写评测标签，<b>不反向修改风险条款库业务样本内容</b>；业务库与评测库相互隔离。</div>';
+  } else {
+    html+='<div>同一样本的多人标注结果不一致，工单已自动变为【待仲裁】。</div>'+
+      '<div>评测仲裁管理员进入后可查看多方标注记录并录入最终仲裁真值，作为该样本最终真值。</div>';
+  }
+  html+='</div>';
+  if(isDone&&state.evalRole==='arbitrator'){
+    html+='<div class="model-unlock" style="margin-top:12px;">🔓 原始模型预判已解锁（仅评测仲裁管理员 · 提交真值后可见）'+
+      '<div class="model-body" style="border-top:none;padding-top:6px;">'+
+      '<div><span class="mb-k">初判差异</span>'+ST_LABEL[w.modelSnapshot.type]+'</div>'+
+      '<div><span class="mb-k">初判风险</span>'+esc(w.modelSnapshot.risk)+'</div>'+
+      '<div><span class="mb-k">规则编号</span>'+esc(w.modelSnapshot.ruleNo)+'</div>'+
+      '<div><span class="mb-k">判定依据</span>'+esc(w.modelSnapshot.basis)+'</div></div></div>';
+  }
+  html+='<div style="display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;">'+
+    '<button class="btn btn-primary" id="resultBack">返回双盲审核工单列表</button>'+
+    '<span class="countdown" id="countdown">2.8 秒后自动返回…</span></div>';
+  document.getElementById('resultBody').innerHTML=html;
+  document.getElementById('resultMask').classList.add('show');
+  document.getElementById('resultBack').addEventListener('click',backToList);
+
+  // 自动跳转回双盲审核工单列表（页面11），URL 参数兜底状态同步
+  state.redirectUrl=buildBackUrl(w,true);
+  document.getElementById('backBtn').dataset.href=state.redirectUrl;
+  if(!location.search.includes('nojump=1')){
+    setTimeout(()=>{ window.location.href=state.redirectUrl; },2800);
+  }
+}
+/* 返回工单列表：带工单元信息，便于列表在 localStorage 不可用时仍可重建该工单 */
+function buildBackUrl(w,submitted){
+  const q=new URLSearchParams({
+    woId:w.id, woStatus:w.status, truthBack:submitted?'1':'0', role:state.role,
+    sampleId:w.sampleId, clause:w.clause, diff:w.diff, contract:w.contract
+  });
+  return 'page11.html?'+q.toString();
+}
+function backToList(){ window.location.href=buildBackUrl(currentWO(),state.submitted); }
+
+/* ===== 权限 ===== */
+function applyPerm(){
+  document.body.classList.toggle('role-legal',state.evalRole==='legal');
+  document.body.classList.toggle('role-annotator',state.evalRole==='annotator');
+  document.body.classList.toggle('role-arbitrator',state.evalRole==='arbitrator');
+  document.getElementById('permHint').textContent=EVAL_ROLE_LABEL[state.evalRole];
+  document.getElementById('evalRoleSel').value=state.evalRole;
+  document.querySelectorAll('.sb-admin-only').forEach(el=>{ el.style.display=state.role==='admin'?'flex':'none'; });
+  renderTruthPanel();
+}
+
+/* ===== 绑定 ===== */
+function bind(){
+  document.getElementById('evalRoleSel').addEventListener('change',e=>{
+    state.evalRole=e.target.value; applyPerm();
+    if(state.evalRole==='legal') toast('法务业务复核链路与评测工单体系隔离，无访问权限');
+  });
+  document.getElementById('sbToggle').addEventListener('click',()=>{ document.getElementById('sidebar').classList.toggle('collapsed'); });
+  document.getElementById('viewSeg').addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b) return;
+    document.querySelectorAll('#viewSeg button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); state.view=b.dataset.view;
+    document.getElementById('panes').classList.toggle('single',state.view==='single');
+  });
+  document.getElementById('syncSwitch').addEventListener('click',e=>{
+    state.sync=!state.sync; e.currentTarget.classList.toggle('on',state.sync);
+  });
+  document.querySelectorAll('.sb-item[data-nav], .sb-sub[data-nav]').forEach(it=>{
+    it.addEventListener('click',()=>{
+      const cfg=NAV[it.dataset.nav];
+      if(cfg&&cfg.url){ window.location.href=go(cfg.url); return; }
+      toast('演示原型：该模块暂未开放');
+    });
+  });
+}
+
+/* ===== 初始化 ===== */
+(function init(){
+  const p=new URLSearchParams(location.search);
+  const r=p.get('role'); if(r) state.role=r;
+  const er=p.get('evalRole'); if(er&&EVAL_ROLE_LABEL[er]) state.evalRole=er;
+  // 入口白名单：仅评测集列表（eval）与双盲审核工单列表（qc）可进入，业务链路不得作为入口
+  state.from = (p.get('from')==='eval'||p.get('from')==='qc') ? p.get('from') : 'qc';
+  const w=ensureWorkOrder(p);
+  state.woId=w.id;
+  // 已有 A 标注且 B 未标注时，默认由第二位标注人接手（便于演示多人独立标注 → 分歧仲裁）
+  if(w.annotations.some(a=>a.reviewer==='评测审核员 A')&&!w.annotations.some(a=>a.reviewer==='评测审核员 B')) state.reviewer='B';
+  // 暂存草稿回填
+  if(w.draft) state.form={type:w.draft.type||'',risk:w.draft.risk||'',note:w.draft.note||''};
+  // 已完成工单回显最终真值（只读）
+  if(w.status==='done'&&w.truth) state.form={type:w.truth.type||'',risk:w.truth.risk||'',note:w.truth.note||''};
+  renderAlignBar(w);
+  renderPanes(w);
+  setTimeout(bindSyncScroll,200);   // 延后绑定，避免初始章节定位触发的滚动事件被按比例二次同步
+  applyPerm();
+  bind();
+})();
+</script>
+
+<script>
+/* 二级菜单手风琴：与全站 12 页一致（默认折叠，仅展开含 active 项的组） */
+(function(){
+  function toggleGroup(p){
+    var g=p.closest('.sb-group'); if(!g) return;
+    var willOpen=!g.classList.contains('open');
+    document.querySelectorAll('#sbNav .sb-group').forEach(function(x){x.classList.remove('open');});
+    if(willOpen) g.classList.add('open');
+  }
+  document.querySelectorAll('#sbNav .sb-group > .sb-parent').forEach(function(p){
+    p.addEventListener('click',function(){ toggleGroup(p); });
+  });
+  var act=document.querySelector('#sbNav .sb-item.active, #sbNav .sb-sub.active');
+  if(act){ var g=act.closest('.sb-group'); if(g) g.classList.add('open'); }
+})();
+</script>
+</body>
+</html>

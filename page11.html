@@ -142,6 +142,13 @@
   .sb-children .sb-sub{padding-left:32px;}
   .sidebar.collapsed .sb-children{display:none!important;}
   .sidebar.collapsed .sb-caret{display:none;}
+
+  /* ===== 双盲真值复核工单（页面14）入口与回写联动 ===== */
+  .truth-sync{background:#FBF6FF;border:1px solid var(--review-bd);color:var(--ink-2);border-radius:6px;padding:9px 12px;font-size:12px;line-height:1.8;margin-bottom:12px;}
+  .truth-sync b{color:var(--review-text);}
+  .btn-truth{color:var(--review-text);border-color:var(--review-bd);}
+  .btn-truth:hover{background:#FBF6FF;color:var(--review-text);border-color:var(--review-bd);}
+  .t-truth{background:var(--review-bg);color:var(--review-text);border:1px solid var(--review-bd);}
 </style>
 </head>
 <body>
@@ -214,6 +221,8 @@
 
       <!-- 主视图（法务 / 管理员） -->
       <div class="main-view">
+        <!-- 页面14 真值回写联动提示 -->
+        <div class="truth-sync" id="truthSync" style="display:none;"></div>
         <!-- 统计 -->
         <div class="stats" id="stats"></div>
 
@@ -296,6 +305,49 @@ const WOS = [
 
 const state = { role:'legal', tab:'blind', blindRev:'A', evalSeq:10 };
 
+/* ============ 双盲真值复核工单（页面14）：独立工单体系入口 ============
+   页面14 评测链路工单与本页原有盲审弹窗并存，互不覆盖；每行【去复核】跳详情页。
+   存储不可用时用内置 seed 兜底，保证预览环境下工单列表与跳转链路完整。 */
+const TRUTH_WO_KEY='CLM_TRUTH_WO_V1';
+const TRUTH_RESULT_KEY='CLM_TRUTH_RESULT_V1';
+const TRUTH_WO_SEED=[
+  {id:'TW-2026-001',sampleId:'EV-001',clause:'3.2 付款账期',diff:'d1',contract:'HT-SUP-2026-001',status:'pending',annotations:[]},
+  {id:'TW-2026-002',sampleId:'EV-004',clause:'6.1 保密义务',diff:'d4',contract:'HT-SUP-2026-002',status:'pending',annotations:[{reviewer:'评测审核员 A'}]},
+  {id:'TW-2026-003',sampleId:'EV-005',clause:'7.2 交付地点',diff:'d6',contract:'HT-SUP-2026-001',status:'arb',annotations:[{reviewer:'评测审核员 A'},{reviewer:'评测审核员 B'}]},
+  {id:'TW-2026-004',sampleId:'EV-008',clause:'10.2 争议管辖',diff:'d8',contract:'HT-SUP-2026-001',status:'done',annotations:[{reviewer:'评测审核员 A'}],truth:{type:'mod',risk:'高',source:'单人真值'}}
+];
+function loadTruthWOs(){ try{ const a=JSON.parse(localStorage.getItem(TRUTH_WO_KEY)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function loadTruthResults(){ try{ const a=JSON.parse(localStorage.getItem(TRUTH_RESULT_KEY)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function mergeTruthReviewOrders(){
+  const saved=loadTruthWOs();
+  const all=TRUTH_WO_SEED.map(x=>Object.assign({},x));
+  saved.forEach(w=>{ const i=all.findIndex(x=>x.id===w.id); if(i>=0) all[i]=Object.assign(all[i],w); else all.push(w); });
+  all.forEach(w=>{
+    if(WOS.some(x=>x.id===w.id)) return;
+    WOS.push({
+      id:w.id, src:w.contract||'HT-SUP-2026-001', clause:w.clause||'评测样本', diff:w.diff||'d1',
+      status:w.status==='done'?'done':w.status==='arb'?'arb':'blind',
+      truthWO:true, sampleId:w.sampleId||'', truth:w.truth||null, annotations:w.annotations||[],
+      A:{done:false,type:'',risk:'',note:''}, B:{done:false,type:'',risk:'',note:''}
+    });
+  });
+}
+function renderTruthSync(){
+  const el=document.getElementById('truthSync'); if(!el) return;
+  const rs=loadTruthResults().filter(r=>r&&r.final);
+  const woCount=WOS.filter(w=>w.truthWO).length;
+  if(!rs.length&&!woCount){ el.style.display='none'; return; }
+  el.style.display='block';
+  el.innerHTML='<b>独立真值复核工单体系</b>：共 '+woCount+' 条双盲真值工单，已回写人工真值 <b>'+rs.length+'</b> 条。'+
+    '<span style="color:var(--ink-3);">真值标注与法务业务复核工单完全隔离；点击【去复核】进入双盲真值复核工单详情页录入真值。</span>';
+}
+/* 入口2：每行【去复核】→ 页面14（待仲裁工单自动以评测仲裁管理员身份进入，便于查看多方标注） */
+function goTruth(id){
+  const w=findW(id); if(!w) return;
+  const q=new URLSearchParams({woId:id,from:'qc',evalRole:(w.status==='arb'?'arbitrator':'annotator'),role:state.role});
+  window.location.href='page14.html?'+q.toString();
+}
+
 /* ============ 评测集真值样本：内置双盲遮蔽 ============
    来自【页面12】真值复核的样本生成独立工单，遮蔽系统初判 / 法务复核 / 入库审批意见 / 真值答案；
    盲审结论回写 CLM_BLIND_RESULT_V1，供【页面10】自动统计指标。 */
@@ -347,6 +399,11 @@ function renderStats(){
 }
 
 function verdictSummary(w){
+  if(w.truthWO){
+    if(w.status==='done') return '真值已标注'+(w.truth?('（'+ST_LABEL[w.truth.type]+' / '+w.truth.risk+'）'):'')+' → 已回写评测集样本';
+    if(w.status==='arb') return '多人标注结果不一致 · 待仲裁（'+(w.annotations||[]).length+' 方标注）';
+    return '待标注真值'+(w.annotations&&w.annotations.length?(' · 已有 '+w.annotations.length+' 方标注'):'');
+  }
   if(w.status==='done'){
     if(w.agree) return '双方一致 → 已纳入 '+w.evalId;
     return '经仲裁 → 已纳入 '+(w.evalId||'评测集');
@@ -368,10 +425,16 @@ function renderTable(){
       : w.status==='arb'?'<span class="tag t-arb">待仲裁</span>'
       : '<span class="tag t-done">已完成</span>';
     let op='';
-    if(w.status==='blind') op='<button class="btn btn-sm btn-primary" onclick="openBlind(\''+w.id+'\')">进入盲审</button>';
-    else if(w.status==='arb') op='<button class="btn btn-sm btn-primary" onclick="openArb(\''+w.id+'\')">进入仲裁</button>';
-    else op='<button class="btn btn-sm" onclick="openBlind(\''+w.id+'\')">查看</button>';
-    op+='<button class="btn btn-sm" onclick="traceOrigin(\''+w.id+'\')">溯源原文</button>';
+    if(w.truthWO){
+      // 独立评测工单体系：仅提供【去复核】，不串联法务业务复核页 / 旧盲审弹窗
+      op='<button class="btn btn-sm btn-primary btn-truth" onclick="goTruth(\''+w.id+'\')">去复核</button>';
+    } else {
+      if(w.status==='blind') op='<button class="btn btn-sm btn-primary" onclick="openBlind(\''+w.id+'\')">进入盲审</button>';
+      else if(w.status==='arb') op='<button class="btn btn-sm btn-primary" onclick="openArb(\''+w.id+'\')">进入仲裁</button>';
+      else op='<button class="btn btn-sm" onclick="openBlind(\''+w.id+'\')">查看</button>';
+      op+='<button class="btn btn-sm" onclick="traceOrigin(\''+w.id+'\')">溯源原文</button>';
+      op='<button class="btn btn-sm btn-primary btn-truth" onclick="goTruth(\''+w.id+'\')">去复核</button>'+op;
+    }
     return '<tr>'+
       '<td class="code">'+w.id+'</td>'+
       '<td class="code">'+w.src+'</td>'+
@@ -515,8 +578,25 @@ function bind(){
   const r=p.get('role');
   if(r&&['procurement','legal','admin'].includes(r)){ state.role=r; document.getElementById('roleSel').value=r; }
   mergeTruthWorkOrders();
-  renderStats(); renderTable(); applyPerm(); bind();
+  mergeTruthReviewOrders();
+  /* 接收页面14 提交真值后的状态回传：URL 参数兜底（localStorage 不可用时仍生效） */
+  const woId=p.get('woId'), woSt=p.get('woStatus');
+  if(woId&&woSt){
+    let w=findW(woId);
+    if(!w){
+      WOS.push({id:woId, src:p.get('contract')||'HT-SUP-2026-001', clause:p.get('clause')||'评测样本',
+        diff:p.get('diff')||'d1', status:'blind', truthWO:true, sampleId:p.get('sampleId')||'',
+        truth:null, annotations:[], A:{done:false,type:'',risk:'',note:''}, B:{done:false,type:'',risk:'',note:''}});
+      w=findW(woId);
+    }
+    w.status = woSt==='done'?'done':woSt==='arb'?'arb':'blind';
+    const res=loadTruthResults().find(x=>x.woId===woId);
+    if(res&&res.truth) w.truth={type:res.truth.type,risk:res.truth.risk,source:res.source};
+    if(p.get('truthBack')==='1') setTimeout(()=>toast('工单 '+woId+' 状态已同步：'+WO_STATUS_TEXT(w.status)),260);
+  }
+  renderStats(); renderTable(); renderTruthSync(); applyPerm(); bind();
 })();
+function WO_STATUS_TEXT(s){ return s==='done'?'复核完成':s==='arb'?'待仲裁':'待复核'; }
 </script>
 
 <script>

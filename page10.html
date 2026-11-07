@@ -180,6 +180,18 @@
   .pager.card{margin-top:10px;border-radius:6px;}
   .pager .pg-info{color:var(--ink-3);font-size:12px;margin-right:6px;}
   .pager .btn-sm{min-height:30px;min-width:30px;padding:4px 11px;}
+
+  /* ===== 双盲真值复核入口 + 真值回写联动（页面14） ===== */
+  .truth-link{background:#FBF6FF;border:1px solid var(--review-bd);color:var(--ink-2);border-radius:6px;padding:9px 12px;font-size:12px;line-height:1.8;margin-bottom:12px;}
+  .truth-link b{color:var(--review-text);}
+  .truth-link .tl-n{color:var(--ink-3);font-size:11px;}
+  .t-truth{background:var(--review-bg);color:var(--review-text);border:1px solid var(--review-bd);}
+  .btn-launch{color:var(--review-text);border-color:var(--review-bd);}
+  .btn-launch:hover{background:#FBF6FF;color:var(--review-text);border-color:var(--review-bd);}
+  /* 操作列三按钮纵向堆叠：固定窄列宽，避免 10 列表格其余列被挤压折行 */
+  .table-scroll .op{max-width:140px;flex-direction:column;align-items:flex-start;gap:4px;}
+  .table-scroll .op .btn{width:100%;text-align:left;white-space:nowrap;}
+  .table-scroll th,.table-scroll .tag,.table-scroll .ok,.table-scroll .bad{white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -273,6 +285,8 @@
           </div>
         </div>
         <div class="truth-banner" id="truthBanner" style="display:none;"></div>
+        <!-- 页面14 真值回写联动：已标注真值样本数 + 自动计算的准确率 / 召回率 -->
+        <div class="truth-link" id="truthLink" style="display:none;"></div>
         <div class="stats" id="metricCards"></div>
         <div class="card" id="metricTableWrap" style="display:none;">
           <table>
@@ -363,6 +377,71 @@ function nowStr(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return d.g
 function sourceOf(e){ return e.source || ((e.type==='难例'||e.type==='规则冲突')?SRC_MINE:SRC_LIB); }
 function tagSource(e){ const s=sourceOf(e); return '<span class="tag '+(s===SRC_MINE?'t-src-mine':'t-src-lib')+' src-nw">'+s+'</span>'; }
 function createdOf(e){ return e.created||'—'; }
+
+/* ============ 双盲真值复核（页面14）联动 ============
+   入口约束：仅「来自风险条款库 + 已启用（active）」的入库样本可发起双盲真值复核。
+   riskSampleId / riskStatus 对齐【页面9】风险条款库真实样本状态；stdClause 为对齐匹配的标准条款编号。 */
+const LIB_BINDING = {
+  'EV-001':{riskSampleId:'RS-001',riskStatus:'active', stdClause:'CL-001'},
+  'EV-002':{riskSampleId:'RS-002',riskStatus:'pending',stdClause:'CL-003'},
+  'EV-003':{riskSampleId:'',      riskStatus:'',       stdClause:'CL-003'},
+  'EV-004':{riskSampleId:'RS-006',riskStatus:'active', stdClause:'CL-009'},
+  'EV-005':{riskSampleId:'RS-008',riskStatus:'active', stdClause:'CL-004'},
+  'EV-006':{riskSampleId:'',      riskStatus:'',       stdClause:'CL-009'},
+  'EV-007':{riskSampleId:'',      riskStatus:'',       stdClause:'CL-010'},
+  'EV-008':{riskSampleId:'RS-004',riskStatus:'active', stdClause:'CL-010'}
+};
+function bindLibSamples(){
+  EVALS.forEach(e=>{
+    const b=LIB_BINDING[e.id];
+    if(b){ Object.assign(e,b); return; }
+    // 风控后台真值复核纳入 / 难例加入的动态样本
+    e.riskSampleId=e.riskSampleId||'';
+    e.riskStatus=e.riskStatus||(sourceOf(e)===SRC_LIB?'active':'');
+    e.stdClause=e.stdClause||'CL-001';
+  });
+}
+function canLaunchBlind(e){ return sourceOf(e)===SRC_LIB && e.riskStatus==='active' && !!e.riskSampleId; }
+function launchBlind(id){
+  const e=EVALS.find(x=>x.id===id); if(!e) return;
+  if(!canLaunchBlind(e)){ toast('仅风险条款库「已启用」的入库样本可发起双盲复核'); return; }
+  const q=new URLSearchParams({
+    sampleId:e.id, diff:e.srcCase||'d1', rs:e.riskSampleId, std:e.stdClause||'CL-001',
+    clause:e.clause, contract:'HT-SUP-2026-001', from:'eval',
+    evalRole:'annotator', role:state.role
+  });
+  window.location.href='page14.html?'+q.toString();
+}
+
+/* 页面14 提交的真值回写结果：人工真值 × 工单创建时冻结的模型初判快照 */
+const TRUTH_RESULT_KEY='CLM_TRUTH_RESULT_V1';
+function loadTruthResults(){
+  try{ const a=JSON.parse(localStorage.getItem(TRUTH_RESULT_KEY)||'[]'); return Array.isArray(a)?a:[]; }
+  catch(e){ return []; }
+}
+function mergeTruthResults(){
+  loadTruthResults().forEach(r=>{
+    if(!r||!r.final||!r.truth||!r.modelSnapshot) return;
+    const e=EVALS.find(x=>x.id===r.sampleId); if(!e) return;
+    // 真值 → 黄金标注；配对的模型初判快照 → 系统初判；仅改评测集样本，绝不写风险条款库
+    e.golden={status:r.truth.type,risk:r.truth.riskCode};
+    e.sys={status:r.modelSnapshot.type,risk:r.modelSnapshot.riskCode};
+    e.truthLabeled=true; e.truthWoId=r.woId; e.truthSource=r.source;
+  });
+}
+function renderTruthLink(){
+  const el=document.getElementById('truthLink'); if(!el) return;
+  const labeled=EVALS.filter(e=>e.truthLabeled);
+  if(!labeled.length){ el.style.display='none'; return; }
+  const m=metrics(labeled), recall=100-m.missRate;
+  el.style.display='block';
+  el.innerHTML='<b>双盲真值回写联动</b>：已标注真值 <b>'+labeled.length+'</b> 条评测集样本，'+
+    '黄金标注与配对的系统初判已更新，驱动上方整体指标自动重算。'+
+    '<br>基于「已标注真值子集」：准确率 <b>'+m.acc.toFixed(1)+'%</b> · 召回率 <b>'+recall.toFixed(1)+'%</b>'+
+    ' <span class="tl-n">（子集口径，与上方全量样本指标不同）</span>'+
+    '<div class="tl-n">召回率 = 1 − 漏检率；后台将人工真值与工单创建时提前快照的模型初判配对后回写，'+
+    '仅更新评测集样本标签（业务库与评测标签相互隔离，不反向修改风险条款库业务样本内容）。</div>';
+}
 
 // 评测样本（黄金标注：标准答案 vs 系统初判）
 const EVALS = [
@@ -600,12 +679,16 @@ function renderTable(){
       '<td class="code">'+e.id+'</td>'+
       '<td><span class="tag '+TYPE_TAG[e.type]+'">'+e.type+'</span></td>'+
       '<td>'+tagSource(e)+'</td>'+
-      '<td><b>'+e.clause+'</b>'+(e.fromTruth?' <span class="tag t-review" title="双盲审核中遮蔽系统初判 / 法务复核 / 真值答案">双盲遮蔽</span>':'')+'</td>'+
+      '<td><b>'+e.clause+'</b>'+(e.fromTruth?' <span class="tag t-review" title="双盲审核中遮蔽系统初判 / 法务复核 / 真值答案">双盲遮蔽</span>':'')+
+        (e.truthLabeled?' <span class="tag t-truth" title="由双盲真值复核工单回写人工真值">已标注真值</span>':'')+'</td>'+
       '<td>'+ans(e.golden)+'</td>'+
       '<td>'+ans(e.sys)+'</td>'+
       '<td>'+(agree?'<span class="ok">✔ 一致</span>':'<span class="bad">✘ 不一致</span>')+'</td>'+
       '<td class="time-nw">'+createdOf(e)+'</td>'+
       '<td><div class="op">'+
+        (canLaunchBlind(e)
+          ? '<button class="btn btn-sm btn-launch" title="跳转双盲真值复核工单详情，自动带入合同原文与匹配标准条款" onclick="launchBlind(\''+e.id+'\')">发起双盲复核</button>'
+          : '<button class="btn btn-sm" disabled title="仅风险条款库「已启用」的入库样本可发起双盲复核">发起双盲复核</button>')+
         '<button class="btn btn-sm btn-primary" onclick="traceCompare(\''+e.id+'\')">溯源原文比对视图</button>'+
         '<button class="btn btn-sm" onclick="doRemove(\''+e.id+'\')">移除</button>'+
       '</div></td>'+
@@ -615,7 +698,7 @@ function renderTable(){
   updateSelUI(pg.rows);
 }
 
-function renderAll(){ renderTruthBanner(); renderMetrics(); renderRecs(); renderTable(); }
+function renderAll(){ renderTruthBanner(); renderTruthLink(); renderMetrics(); renderRecs(); renderTable(); }
 
 /* 溯源：跳转复核审阅页（页面5），query 在 hash 前，自动高亮对应差异 */
 function traceCompare(id){
@@ -761,7 +844,9 @@ function bind(){
   const r=p.get('role');
   if(r&&['procurement','legal','admin'].includes(r)){ state.role=r; document.getElementById('roleSel').value=r; }
   mergeTruthSamples();
-  renderMetrics(); renderRecs(); renderTable(); renderTruthBanner(); applyPerm(); bind();
+  bindLibSamples();      // 关联风险条款库已启用入库样本（入口1 约束）
+  mergeTruthResults();   // 页面14 回写的人工真值 → 更新黄金标注 / 系统初判 / 指标
+  renderMetrics(); renderRecs(); renderTable(); renderTruthBanner(); renderTruthLink(); applyPerm(); bind();
 })();
 </script>
 
