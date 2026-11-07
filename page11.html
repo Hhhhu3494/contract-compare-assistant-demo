@@ -146,8 +146,9 @@
   /* ===== 双盲真值复核工单（页面14）入口与回写联动 ===== */
   .truth-sync{background:#FBF6FF;border:1px solid var(--review-bd);color:var(--ink-2);border-radius:6px;padding:9px 12px;font-size:12px;line-height:1.8;margin-bottom:12px;}
   .truth-sync b{color:var(--review-text);}
-  .btn-truth{color:var(--review-text);border-color:var(--review-bd);}
-  .btn-truth:hover{background:#FBF6FF;color:var(--review-text);border-color:var(--review-bd);}
+  /* 【去复核】统一白底：紫字紫框，与其余蓝色主操作按钮区分；hover 仅作极浅紫反馈 */
+  .btn-truth{background:#fff;color:var(--review-text);border-color:var(--review-bd);}
+  .btn-truth:hover,.btn-truth:focus-visible{background:#FBF6FF;color:var(--review-text);border-color:var(--review-bd);}
   .t-truth{background:var(--review-bg);color:var(--review-text);border:1px solid var(--review-bd);}
 </style>
 </head>
@@ -427,13 +428,13 @@ function renderTable(){
     let op='';
     if(w.truthWO){
       // 独立评测工单体系：仅提供【去复核】，不串联法务业务复核页 / 旧盲审弹窗
-      op='<button class="btn btn-sm btn-primary btn-truth" onclick="goTruth(\''+w.id+'\')">去复核</button>';
+      op='<button class="btn btn-sm btn-truth" onclick="goTruth(\''+w.id+'\')">去复核</button>';
     } else {
       if(w.status==='blind') op='<button class="btn btn-sm btn-primary" onclick="openBlind(\''+w.id+'\')">进入盲审</button>';
       else if(w.status==='arb') op='<button class="btn btn-sm btn-primary" onclick="openArb(\''+w.id+'\')">进入仲裁</button>';
       else op='<button class="btn btn-sm" onclick="openBlind(\''+w.id+'\')">查看</button>';
       op+='<button class="btn btn-sm" onclick="traceOrigin(\''+w.id+'\')">溯源原文</button>';
-      op='<button class="btn btn-sm btn-primary btn-truth" onclick="goTruth(\''+w.id+'\')">去复核</button>'+op;
+      op='<button class="btn btn-sm btn-truth" onclick="goTruth(\''+w.id+'\')">去复核</button>'+op;
     }
     return '<tr>'+
       '<td class="code">'+w.id+'</td>'+
