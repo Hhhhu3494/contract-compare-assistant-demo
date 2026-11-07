@@ -139,6 +139,20 @@
   .sb-children .sb-sub{padding-left:32px;}
   .sidebar.collapsed .sb-children{display:none!important;}
   .sidebar.collapsed .sb-caret{display:none;}
+
+  /* ===== 提报时间列 + 排序（与页面1/6/10 的 th[data-sort] + .sort-ico 保持统一） ===== */
+  th[data-sort]{cursor:pointer;user-select:none;}
+  th[data-sort]:hover{color:var(--brand);}
+  th[data-sort]:focus-visible{outline:2px solid var(--brand);outline-offset:-2px;}
+  .sort-ico{font-size:10px;margin-left:2px;color:var(--brand);}
+  .time-nw{white-space:nowrap;color:var(--ink-2);font-size:12px;}
+  .time-nw.pending{color:var(--ink-3);}
+  /* 9 列表格：收紧 cell 间距，窄屏保留横向滚动 */
+  .table-scroll{overflow-x:auto;}
+  .table-scroll th,.table-scroll td{padding:9px 10px;}
+  .table-scroll th{white-space:nowrap;}          /* 9 列下表头不折行 */
+  .table-scroll td.code{white-space:nowrap;}     /* 样本编号 / 来源合同保持单行 */
+  .table-scroll .clamp{max-width:220px;}         /* 长文本列让出宽度，避免挤压短列 */
 </style>
 </head>
 <body>
@@ -249,12 +263,14 @@
 
         <!-- 样本列表 -->
         <div class="sec-title"><span class="line"></span>风险样本列表</div>
-        <div class="card">
+        <div class="card table-scroll">
           <table>
             <thead>
               <tr>
                 <th>样本编号</th><th>风险分类</th><th>等级</th><th>风险原文（概要）</th>
-                <th>入库状态</th><th>来源合同</th><th>管控说明</th><th>操作</th>
+                <th>入库状态</th><th>来源合同</th><th>管控说明</th>
+                <th data-sort="submit" id="thSubmit" tabindex="0" role="button" aria-sort="descending" title="点击切换提报时间排序">提报时间<span class="sort-ico" id="submitInd">▼</span></th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody id="tbody"></tbody>
@@ -305,61 +321,63 @@ const SAMPLES = [
    orig:'付款账期由 90 日收紧至 60 日，影响供应商现金流排布',
    miss:'漏判将导致财务无法提前安排资金，触发逾期违约金且影响供应链稳定',
    basis:'规则 R-12 命中：账期条款变更超出标准模板容差',
-   contract:'HT-SUP-2026-001', srcCase:'d1',
+   contract:'HT-SUP-2026-001', srcCase:'d1', submitTime:'2026-11-01 09:20',
    ctrl:'纳入标准账期模板，比对时强制高亮并提醒资金影响',
    version:['V1.0 初版沉淀（2026-11-01）','V1.1 补充漏判后果说明']},
   {id:'RS-002', cat:'法务合规类', level:'high', status:'pending', clause:'CL-003',
    orig:'删除原逾期高额违约金条款，违约约束被实质性削弱',
    miss:'漏判将导致违约成本大幅降低，买方缺乏制约手段',
    basis:'规则 R-07 命中：关键违约条款缺失',
-   contract:'HT-SUP-2026-001', srcCase:'d3',
+   contract:'HT-SUP-2026-001', srcCase:'d3', submitTime:'2026-11-03 10:45',
    ctrl:'沉淀为高等级风险样本，触发二期相似度比对告警',
    version:['V1.0 初版沉淀（2026-11-03）']},
   {id:'RS-003', cat:'交付类', level:'mid', status:'disabled', clause:'CL-008',
    orig:'运费承担主体表述冲突，语义模糊',
    miss:'漏判将导致后续履约争议，责任边界不清',
    basis:'规则 R-19 命中：语义冲突条款',
-   contract:'HT-SUP-2026-001', srcCase:'d5',
+   contract:'HT-SUP-2026-001', srcCase:'d5', submitTime:'2026-10-28 14:30',
    ctrl:'已停用：标准条款已明确运费由供方承担，旧样本不再适用',
    version:['V1.0 初版沉淀（2026-10-28）','V1.1 标记待重点复核']},
   {id:'RS-004', cat:'法务合规类', level:'high', status:'active', clause:'CL-010',
    orig:'合同解除条件较标准模板偏宽松',
    miss:'漏判将导致买方解除权受限，绑定风险上升',
    basis:'规则冲突：解除条件与标准模板不一致',
-   contract:'HT-SUP-2026-001', srcCase:'d7',
+   contract:'HT-SUP-2026-001', srcCase:'d7', submitTime:'2026-11-03 16:05',
    ctrl:'沉淀为高等级风险样本，升级复核等级',
    version:['V1.0 初版沉淀（2026-11-03）']},
   {id:'RS-005', cat:'财务类', level:'low', status:'draft', clause:'CL-001',
    orig:'新增对账时点条款，表述清晰',
    miss:'漏判影响有限，仅涉及对账节奏',
    basis:'规则 R-20 命中：新增良性条款',
-   contract:'HT-SUP-2026-002', srcCase:'d4',
+   contract:'HT-SUP-2026-002', srcCase:'d4', submitTime:'', // 草稿尚未提报
    ctrl:'草稿：等待法务提报后进入审批',
    version:['V0.9 草稿（2026-11-04）']},
   {id:'RS-006', cat:'法务合规类', level:'low', status:'active', clause:'CL-009',
    orig:'新增买方所在地管辖条款，符合标准模板',
    miss:'漏判影响低，属良性新增',
    basis:'规则 R-31 命中：新增良性条款',
-   contract:'HT-SUP-2026-002', srcCase:'d8',
+   contract:'HT-SUP-2026-002', srcCase:'d8', submitTime:'2026-11-03 11:12',
    ctrl:'沉淀为低风险样本，作为良性比对基准',
    version:['V1.0 初版沉淀（2026-11-03）']},
   {id:'RS-007', cat:'供应类', level:'mid', status:'pending', clause:'CL-005',
    orig:'供应商资质门槛较标准模板降低',
    miss:'漏判将导致不合格供应商进入，履约风险上升',
    basis:'规则 R-05 命中：资质条款弱化',
-   contract:'HT-SUP-2026-003', srcCase:'d2',
+   contract:'HT-SUP-2026-003', srcCase:'d2', submitTime:'2026-11-04 09:38',
    ctrl:'沉淀为中等级风险样本，触发资质复核',
    version:['V1.0 初版沉淀（2026-11-04）']},
   {id:'RS-008', cat:'采购类', level:'low', status:'active', clause:'CL-004',
    orig:'采购数量 ±10% 浮动免违约责任',
    miss:'漏判影响低，属标准弹性条款',
    basis:'规则 R-11 命中：数量浮动条款',
-   contract:'HT-SUP-2026-001', srcCase:'d6',
+   contract:'HT-SUP-2026-001', srcCase:'d6', submitTime:'2026-10-26 15:50',
    ctrl:'沉淀为低风险样本，作为弹性条款基准',
    version:['V1.0 初版沉淀（2026-10-26）']}
 ];
 
-const state = { role:'legal', kw:'', cat:'', status:'', level:'', clause:'' };
+/* 提报时间默认倒序：打开页面即显示最新提报的样本与 ▼ 指示器 */
+const state = { role:'legal', kw:'', cat:'', status:'', level:'', clause:'',
+  sortKey:'submit', sortDir:'desc' };
 
 /* ============ 接收【页面12】负责人审核通过的样本 ============
    仅加载「带审核人 + 审核时间 + 样本入库留痕」的记录；页面5 从不写此 key，故不存在自动入库。 */
@@ -380,7 +398,8 @@ function mergeApprovedSamples(){
       ctrl:'负责人审核通过入库 · 申请 '+x.applyId+' · 审核人 '+x.reviewer+' · '+x.reviewTime+'（未自动入库）',
       version:['V1.0 由入库申请 '+x.applyId+' 审核通过生成（'+x.reviewTime+'）'],
       fromApply:true, fromApplyId:x.applyId, applicant:x.applicant||'', applyTime:x.applyTime||'',
-      reviewer:x.reviewer||'', reviewTime:x.reviewTime||'', reviewNote:x.reviewNote||'', logs:x.logs||[]
+      reviewer:x.reviewer||'', reviewTime:x.reviewTime||'', reviewNote:x.reviewNote||'', logs:x.logs||[],
+      submitTime:(x.applyTime||x.reviewTime||'')   // 动态入库样本取入库申请时间作为提报时间
     });
   });
 }
@@ -391,10 +410,41 @@ function showModal(id){ document.getElementById(id).classList.add('show'); }
 function closeModal(id){ document.getElementById(id).classList.remove('show'); }
 function row(k,v){ return '<div class="row"><span class="k">'+k+'</span><span class="v">'+v+'</span></div>'; }
 function stat(n,l,cls){ return '<div class="stat '+cls+'"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>'; }
+function nowStr(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); }
+
+/* ============ 提报时间：默认倒序 + 切换排序 ============
+   时间格式统一 YYYY-MM-DD HH:mm，字典序即时间序；未提报（草稿）为空值，恒排末尾。 */
+function submitCell(s){
+  return s.submitTime
+    ? '<span class="time-nw">'+s.submitTime+'</span>'
+    : '<span class="time-nw pending" title="草稿尚未提报入库">待提报</span>';
+}
+function sortSamples(list){
+  if(state.sortKey!=='submit') return list;
+  return list.slice().sort((a,b)=>{
+    const ta=a.submitTime||'', tb=b.submitTime||'';
+    if(!ta && !tb) return a.id.localeCompare(b.id);
+    if(!ta) return 1; if(!tb) return -1;      // 未提报恒排末尾
+    if(ta===tb) return a.id.localeCompare(b.id);
+    const c = ta<tb ? -1 : 1;
+    return state.sortDir==='desc' ? -c : c;
+  });
+}
+function updateSortInd(){
+  const ind=document.getElementById('submitInd'), th=document.getElementById('thSubmit');
+  if(ind) ind.textContent = state.sortKey==='submit' ? (state.sortDir==='asc'?'▲':'▼') : '';
+  if(th) th.setAttribute('aria-sort', state.sortKey==='submit' ? (state.sortDir==='asc'?'ascending':'descending') : 'none');
+}
+function setSort(key){
+  if(key!=='submit') return;
+  if(state.sortKey===key) state.sortDir = state.sortDir==='desc' ? 'asc' : 'desc';
+  else { state.sortKey=key; state.sortDir='desc'; }
+  renderTable();
+}
 
 function filtered(){
   const kw=state.kw.trim().toLowerCase();
-  return SAMPLES.filter(s=>{
+  const list=SAMPLES.filter(s=>{
     if(state.cat && s.cat!==state.cat) return false;
     if(state.status && s.status!==state.status) return false;
     if(state.level && s.level!==state.level) return false;
@@ -402,6 +452,7 @@ function filtered(){
     if(kw && !(s.orig.toLowerCase().includes(kw)||s.id.toLowerCase().includes(kw)||s.contract.toLowerCase().includes(kw))) return false;
     return true;
   });
+  return sortSamples(list);   // 先筛选，再按提报时间排序
 }
 
 /* 统计 */
@@ -422,6 +473,7 @@ function renderStats(){
 function renderTable(){
   const list=filtered();
   const tb=document.getElementById('tbody');
+  updateSortInd();                       // 首行调用，保证打开页面即显示 ▼
   if(!list.length){ tb.innerHTML=''; document.getElementById('emptyTip').style.display='block'; return; }
   document.getElementById('emptyTip').style.display='none';
   tb.innerHTML=list.map(s=>{
@@ -433,6 +485,7 @@ function renderTable(){
       '<td><span class="tag '+STATUS_TAG[s.status]+'">'+STATUS_LABEL[s.status]+'</span></td>'+
       '<td class="code">'+s.contract+'</td>'+
       '<td><div class="clamp">'+s.ctrl+'</div></td>'+
+      '<td>'+submitCell(s)+'</td>'+
       '<td>'+opBtns(s)+'</td>'+
     '</tr>';
   }).join('');
@@ -497,7 +550,7 @@ function traceOriginalCase(id){ go('page8.html'); }
 
 /* 状态流转 */
 function findS(id){ return SAMPLES.find(x=>x.id===id); }
-function doSubmit(id){ const s=findS(id); if(!s) return; s.status='pending'; toast('已提报入库（演示）：'+s.id+' → 待审批'); renderAll(); }
+function doSubmit(id){ const s=findS(id); if(!s) return; if(!s.submitTime) s.submitTime=nowStr(); s.status='pending'; toast('已提报入库（演示）：'+s.id+' → 待审批'); renderAll(); }
 function doApprove(id){ const s=findS(id); if(state.role!=='admin'){toast('仅管理员可审批入库');return;} s.status='active'; toast('已审批入库（演示）：'+s.id+' → 已启用'); renderAll(); }
 function doReject(id){ const s=findS(id); if(state.role!=='admin'){toast('仅管理员可驳回');return;} s.status='draft'; toast('已驳回（演示）：'+s.id+' → 草稿'); renderAll(); }
 function doToggle(id){ const s=findS(id); if(state.role!=='admin'){toast('仅管理员可启停样本');return;} s.status=(s.status==='active')?'disabled':'active'; toast((s.status==='active'?'已启用':'已停用')+'（演示）：'+s.id); renderAll(); }
@@ -538,6 +591,12 @@ function bind(){
   document.getElementById('fLevel').addEventListener('change',e=>{state.level=e.target.value;renderTable();});
   document.getElementById('roleSel').addEventListener('change',e=>{state.role=e.target.value;applyPerm();});
   document.getElementById('addBtn').addEventListener('click',doAdd);
+  /* 提报时间排序：点击 / 键盘 Enter、Space */
+  const ths=document.getElementById('thSubmit');
+  ths.addEventListener('click',()=>setSort('submit'));
+  ths.addEventListener('keydown',e=>{
+    if(e.key==='Enter'||e.key===' '){ e.preventDefault(); setSort('submit'); }
+  });
   document.getElementById('sbToggle').addEventListener('click',()=>{
     const sb=document.getElementById('sidebar'); sb.classList.toggle('collapsed');
     document.getElementById('sbToggle').textContent=sb.classList.contains('collapsed')?'⟩':'⟨';
