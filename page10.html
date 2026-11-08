@@ -752,8 +752,7 @@ function renderTable(){
       '<td class="code">'+e.id+'</td>'+
       '<td><span class="tag '+TYPE_TAG[e.type]+'">'+e.type+'</span></td>'+
       '<td>'+tagSource(e)+'</td>'+
-      '<td><b>'+e.clause+'</b>'+(e.fromTruth?' <span class="tag t-review" title="双盲审核中遮蔽系统初判 / 法务复核 / 真值答案">双盲遮蔽</span>':'')+
-        (e.truthLabeled?' <span class="tag t-truth" title="由双盲真值复核工单回写人工真值">已标注真值</span>':'')+'</td>'+
+      '<td><b>'+e.clause+'</b>'+(e.fromTruth?' <span class="tag t-review" title="双盲审核中遮蔽系统初判 / 法务复核 / 真值答案">双盲遮蔽</span>':'')+'</td>'+
       '<td>'+ans(e.golden)+'</td>'+
       '<td>'+ans(e.sys)+'</td>'+
       '<td>'+(agree?'<span class="ok">✅匹配</span>':'<span class="bad">❌不匹配</span>')+'</td>'+
