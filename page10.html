@@ -166,8 +166,8 @@
   .sel-count b{color:var(--brand);font-size:13px;margin:0 2px;}
   /* ===== 列表表格：10 列 + 复选框 + 来源/时间 ===== */
   .table-scroll{overflow-x:auto;}
-  .table-scroll table{min-width:1240px;}
-  .table-scroll th,.table-scroll td{padding:9px 10px;}
+  .table-scroll table{min-width:0;}
+  .table-scroll th,.table-scroll td{padding:8px 8px;}
   .ck-col,.ck-cell{width:38px;text-align:center!important;}
   .row-ck,#checkAll{width:15px;height:15px;accent-color:var(--brand);cursor:pointer;vertical-align:middle;}
   .t-src-lib{background:#F2F3F5;color:var(--ink-2);border:1px solid var(--line);}
@@ -204,9 +204,12 @@
   .imp-item .meta{color:var(--ink-3);font-size:12px;white-space:nowrap;}
   .imp-item .code{white-space:nowrap;}
   /* 操作列三按钮纵向堆叠：固定窄列宽，避免 10 列表格其余列被挤压折行 */
-  .table-scroll .op{max-width:140px;flex-direction:column;align-items:flex-start;gap:4px;}
-  .table-scroll .op .btn{width:100%;text-align:left;white-space:nowrap;}
-  .table-scroll th,.table-scroll .tag,.table-scroll .ok,.table-scroll .bad{white-space:nowrap;}
+  .table-scroll .op{max-width:120px;flex-direction:column;align-items:stretch;gap:4px;}
+  .table-scroll .op .btn{width:100%;text-align:center;white-space:nowrap;font-size:12px;padding:4px 6px;}
+  .table-scroll th{white-space:normal;line-height:1.3;}
+  .table-scroll .tag,.table-scroll .ok,.table-scroll .bad{white-space:nowrap;}
+  .clause-cell{max-width:200px;}
+  .ans-cell{max-width:150px;}
 </style>
 </head>
 <body>
@@ -832,9 +835,9 @@ function renderTable(){
       '<td class="code">'+e.id+'</td>'+
       '<td><span class="tag '+TYPE_TAG[e.type]+'">'+e.type+'</span></td>'+
       '<td>'+tagSource(e)+'</td>'+
-      '<td><b>'+e.clause+'</b>'+(e.fromTruth?' <span class="tag t-review" title="双盲审核中遮蔽系统初判 / 法务复核 / 真值答案">双盲遮蔽</span>':'')+'</td>'+
-      '<td>'+ans(e.golden)+'</td>'+
-      '<td>'+ans(e.sys)+'</td>'+
+      '<td class="clause-cell"><b>'+e.clause+'</b>'+(e.fromTruth?' <span class="tag t-review" title="双盲审核中遮蔽系统初判 / 法务复核 / 真值答案">双盲遮蔽</span>':'')+'</td>'+
+      '<td class="ans-cell">'+ans(e.golden)+'</td>'+
+      '<td class="ans-cell">'+ans(e.sys)+'</td>'+
       '<td>'+(agree?'<span class="ok">✅匹配</span>':'<span class="bad">❌不匹配</span>')+'</td>'+
       '<td><span class="tag '+stMeta.cls+'">'+stMeta.label+'</span></td>'+
       '<td class="time-nw">'+createdOf(e)+'</td>'+
