@@ -158,9 +158,7 @@
   .ck-col{width:34px;text-align:center;}
   .ck-cell{text-align:center;width:34px;}
   .rec-flag{font-size:12px;color:var(--ink-3);}            /* 灰字小注：无底色、无彩色标签 */
-  .batchbar{display:flex;align-items:center;gap:12px;margin:6px 0 12px;}
-  .batchbar .sel-count{font-size:12px;color:var(--ink-2);}
-  .batchbar .lock-note{color:var(--ink-3);}
+  .sel-count{font-size:12px;color:var(--ink-2);}
   .dd{position:relative;display:inline-block;}
   .dd-menu{position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid var(--line);border-radius:6px;min-width:196px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:40;padding:4px;}
   .dd-item{padding:9px 12px;font-size:13px;color:var(--ink-1);cursor:pointer;border-radius:4px;white-space:nowrap;}
@@ -173,6 +171,17 @@
   .imp-item:last-child{border-bottom:none;}
   .imp-item .meta{color:var(--ink-3);font-size:12px;white-space:nowrap;}
   .imp-item .code{white-space:nowrap;}
+
+  /* 分页器 */
+  .pager{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 4px 2px;flex-wrap:wrap;}
+  .pager .total{font-size:12px;color:var(--ink-3);}
+  .pager .pg-controls{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .pager .pg-btn{border:1px solid var(--line);background:#fff;color:var(--ink-2);border-radius:4px;min-width:30px;height:30px;padding:0 9px;font-size:12px;cursor:pointer;}
+  .pager .pg-btn:hover:not(:disabled){border-color:var(--brand);color:var(--brand);}
+  .pager .pg-btn.active{background:var(--brand);border-color:var(--brand);color:#fff;}
+  .pager .pg-btn:disabled{opacity:.45;cursor:not-allowed;}
+  .pager .pg-size{border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-size:12px;background:#fff;color:var(--ink-1);}
+  .pager .pg-ellipsis{color:var(--ink-3);padding:0 2px;}
 </style>
 </head>
 <body>
@@ -288,22 +297,20 @@
           </select>
           <div class="spacer"></div>
           <button class="btn btn-primary mgr-only" id="addBtn">＋ 新增样本</button>
-        </div>
-
-        <!-- 样本列表 -->
-        <div class="sec-title"><span class="line"></span>风险样本列表</div>
-        <!-- 批量操作条（表格顶部）：单条/批量勾选后可用；法务、管理员均可见可用 -->
-        <div class="batchbar">
+          <!-- 批量操作（与筛选框同行，最右） -->
           <span class="sel-count" id="p9selCount" style="display:none;">已选 <b id="p9selNum">0</b> 条</span>
           <div class="dd" id="batchDD">
             <button class="btn" id="batchDDToggle" aria-haspopup="true" aria-expanded="false">批量操作 ▾</button>
             <div class="dd-menu" id="batchMenu" style="display:none;">
               <div class="dd-item" id="ddMark">批量标记推荐评测</div>
-              <div class="dd-item" id="ddImport">批量导入评测集</div>
+              <div class="dd-item" id="ddImport">批量导出到评测集</div>
             </div>
           </div>
-          <span class="lock-note" id="batchHint">勾选样本后可批量标记推荐 / 导入评测集</span>
+          <button class="btn" id="clearSelBtn" style="display:none;">取消选择</button>
         </div>
+
+        <!-- 样本列表 -->
+        <div class="sec-title"><span class="line"></span>风险样本列表</div>
         <div class="card table-scroll">
           <table>
             <thead>
@@ -319,6 +326,21 @@
             <tbody id="tbody"></tbody>
           </table>
           <div class="empty" id="emptyTip" style="display:none;">无匹配样本</div>
+        </div>
+        <!-- 分页器 -->
+        <div class="pager">
+          <span class="total" id="pgTotal"></span>
+          <div class="pg-controls">
+            <select class="pg-size" id="pgSize" aria-label="每页条数">
+              <option value="5" selected>5 条/页</option>
+              <option value="10">10 条/页</option>
+              <option value="20">20 条/页</option>
+              <option value="50">50 条/页</option>
+            </select>
+            <button class="pg-btn" id="pgPrev" aria-label="上一页">‹ 上一页</button>
+            <span id="pgNums" style="display:flex;gap:6px;"></span>
+            <button class="pg-btn" id="pgNext" aria-label="下一页">下一页 ›</button>
+          </div>
         </div>
       </div>
     </div>
@@ -367,7 +389,7 @@ const STATUS_TAG={draft:'t-draft',pending:'t-pending',active:'t-active',disabled
 // 标准风险样本（法务审核通过沉淀，用于二期相似度匹配辅助定级）
 // clause 字段关联标准条款库（页面6）的 CL-XXX，支持从条款库点击跳转并自动过滤
 const SAMPLES = [
-  {id:'RS-001', cat:'财务类', level:'mid', status:'active', clause:'CL-001',
+  {id:'RS-001', cat:'财务类', level:'mid', status:'active', recommended:true, clause:'CL-001',
    orig:'付款账期由 90 日收紧至 60 日，影响供应商现金流排布',
    miss:'漏判将导致财务无法提前安排资金，触发逾期违约金且影响供应链稳定',
    basis:'规则 R-12 命中：账期条款变更超出标准模板容差',
@@ -388,7 +410,7 @@ const SAMPLES = [
    contract:'HT-SUP-2026-001', srcCase:'d5', submitTime:'2026-10-28 14:30',
    ctrl:'已停用：标准条款已明确运费由供方承担，旧样本不再适用',
    version:['V1.0 初版沉淀（2026-10-28）','V1.1 标记待重点复核']},
-  {id:'RS-004', cat:'法务合规类', level:'high', status:'active', clause:'CL-010',
+  {id:'RS-004', cat:'法务合规类', level:'high', status:'active', recommended:true, clause:'CL-010',
    orig:'合同解除条件较标准模板偏宽松',
    miss:'漏判将导致买方解除权受限，绑定风险上升',
    basis:'规则冲突：解除条件与标准模板不一致',
@@ -402,7 +424,7 @@ const SAMPLES = [
    contract:'HT-SUP-2026-002', srcCase:'d4', submitTime:'', // 草稿尚未提报
    ctrl:'草稿：等待法务提报后进入审批',
    version:['V0.9 草稿（2026-11-04）']},
-  {id:'RS-006', cat:'法务合规类', level:'low', status:'active', clause:'CL-009',
+  {id:'RS-006', cat:'法务合规类', level:'low', status:'active', recommended:true, clause:'CL-009',
    orig:'新增买方所在地管辖条款，符合标准模板',
    miss:'漏判影响低，属良性新增',
    basis:'规则 R-31 命中：新增良性条款',
@@ -427,7 +449,7 @@ const SAMPLES = [
 
 /* 提报时间默认倒序：打开页面即显示最新提报的样本与 ▼ 指示器 */
 const state = { role:'legal', kw:'', cat:'', status:'', level:'', clause:'', rec:'',
-  sel:new Set(), sortKey:'submit', sortDir:'desc' };
+  sel:new Set(), sortKey:'submit', sortDir:'desc', page:1, pageSize:5 };
 
 /* ============ 接收【页面12】负责人审核通过的样本 ============
    仅加载「带审核人 + 审核时间 + 样本入库留痕」的记录；页面5 从不写此 key，故不存在自动入库。 */
@@ -489,6 +511,7 @@ function setSort(key){
   if(key!=='submit') return;
   if(state.sortKey===key) state.sortDir = state.sortDir==='desc' ? 'asc' : 'desc';
   else { state.sortKey=key; state.sortDir='desc'; }
+  state.page=1;
   renderTable();
 }
 
@@ -524,11 +547,16 @@ function renderStats(){
 /* 列表 */
 function renderTable(){
   const list=filtered();
+  const total=list.length;
+  const totalPages=Math.max(1,Math.ceil(total/state.pageSize));
+  if(state.page>totalPages) state.page=totalPages;
+  if(state.page<1) state.page=1;
+  const start=(state.page-1)*state.pageSize;
+  const pageRows=list.slice(start,start+state.pageSize);
   const tb=document.getElementById('tbody');
   updateSortInd();                       // 首行调用，保证打开页面即显示 ▼
-  if(!list.length){ tb.innerHTML=''; document.getElementById('emptyTip').style.display='block'; return; }
-  document.getElementById('emptyTip').style.display='none';
-  tb.innerHTML=list.map(s=>{
+  document.getElementById('emptyTip').style.display= pageRows.length?'none':'block';
+  tb.innerHTML=pageRows.map(s=>{
     return '<tr>'+
       '<td class="ck-cell"><input type="checkbox" class="row-ck" data-id="'+s.id+'"'+(state.sel.has(s.id)?' checked':'')+' aria-label="选择样本 '+s.id+'"></td>'+
       '<td class="code">'+s.id+'</td>'+
@@ -538,12 +566,45 @@ function renderTable(){
       '<td><span class="tag '+STATUS_TAG[s.status]+'">'+STATUS_LABEL[s.status]+'</span></td>'+
       '<td class="code">'+s.contract+'</td>'+
       '<td><div class="clamp">'+s.ctrl+'</div></td>'+
-      '<td>'+(s.recommended?'<span class="rec-flag">已推荐</span>':'')+'</td>'+
+      '<td>'+(s.recommended?'<span class="rec-flag">是</span>':'')+'</td>'+
       '<td>'+submitCell(s)+'</td>'+
       '<td>'+opBtns(s)+'</td>'+
     '</tr>';
   }).join('');
+  renderPager(total,totalPages);
+  syncCheckAll(pageRows);
   updateP9SelUI();
+}
+/* 分页器渲染 */
+function renderPager(total,totalPages){
+  const t=document.getElementById('pgTotal'); if(t) t.textContent='共 '+total+' 条 · 第 '+state.page+' / '+totalPages+' 页';
+  const prev=document.getElementById('pgPrev'); if(prev) prev.disabled = state.page<=1;
+  const next=document.getElementById('pgNext'); if(next) next.disabled = state.page>=totalPages;
+  const nums=document.getElementById('pgNums'); if(!nums) return;
+  nums.innerHTML='';
+  pageList(state.page,totalPages).forEach(p=>{
+    if(p==='...'){ const s=document.createElement('span'); s.className='pg-ellipsis'; s.textContent='…'; nums.appendChild(s); return; }
+    const b=document.createElement('button'); b.className='pg-btn'+(p===state.page?' active':''); b.textContent=p;
+    b.addEventListener('click',()=>{ state.page=p; renderTable(); });
+    nums.appendChild(b);
+  });
+}
+function pageList(cur,total){
+  if(total<=7) return Array.from({length:total},(_,i)=>i+1);
+  const arr=[1];
+  if(cur>3) arr.push('...');
+  for(let i=Math.max(2,cur-1);i<=Math.min(total-1,cur+1);i++) arr.push(i);
+  if(cur<total-2) arr.push('...');
+  arr.push(total);
+  return arr;
+}
+/* 表头「全选」复选框：反映当前页勾选状态（分页后只对当前页生效） */
+function syncCheckAll(pageRows){
+  const ck=document.getElementById('checkAll'); if(!ck) return;
+  const ids=pageRows.map(s=>s.id);
+  const onPage=ids.filter(id=>state.sel.has(id)).length;
+  ck.checked = ids.length>0 && onPage===ids.length;
+  ck.indeterminate = onPage>0 && onPage<ids.length;
 }
 function opBtns(s){
   let h='';
@@ -623,6 +684,7 @@ function applyClauseFilter(id){
   } else {
     tip.classList.remove('show');
   }
+  state.page=1;
   renderAll();
 }
 function clearClauseFilter(){ applyClauseFilter(''); }
@@ -701,6 +763,8 @@ function updateP9SelUI(){
   const c=document.getElementById('p9selCount'), num=document.getElementById('p9selNum');
   if(c) c.style.display=n?'inline':'none';
   if(num) num.textContent=n;
+  const clr=document.getElementById('clearSelBtn');
+  if(clr) clr.style.display=n?'inline-block':'none';
   const mark=document.getElementById('ddMark');
   if(mark) mark.classList.toggle('disabled', n===0);
   const imp=document.getElementById('ddImport');
@@ -714,7 +778,7 @@ function updateP9SelUI(){
 function openImportConfirm(samples){
   const body=document.getElementById('importBody');
   const items=samples.map(s=>'<div class="imp-item"><span class="code">'+s.id+'</span><span class="clamp">'+s.orig+'</span><span class="meta">'+RISK_LABEL[s.level]+' · '+s.cat+'</span></div>').join('');
-  body.innerHTML='<h3>批量导入评测集（来自风险条款库）</h3>'+
+  body.innerHTML='<h3>批量导出到评测集（来自风险条款库）</h3>'+
     '<div class="note-warn">请优先导入有歧义、容易识别错误的样本，避免大量重复样本灌入评测集。</div>'+
     '<div>本次将导入 <b>'+samples.length+'</b> 条「已入库·启用」样本（复制副本，原样本保留在风险条款库）：</div>'+
     '<div class="imp-list">'+items+'</div>'+
@@ -733,14 +797,14 @@ function doImportConfirm(){
 
 /* 绑定 */
 function bind(){
-  document.getElementById('kw').addEventListener('input',e=>{state.kw=e.target.value;renderTable();});
-  document.getElementById('fCat').addEventListener('change',e=>{state.cat=e.target.value;renderTable();});
-  document.getElementById('fStatus').addEventListener('change',e=>{state.status=e.target.value;renderTable();});
-  document.getElementById('fLevel').addEventListener('change',e=>{state.level=e.target.value;renderTable();});
+  document.getElementById('kw').addEventListener('input',e=>{state.kw=e.target.value;state.page=1;renderTable();});
+  document.getElementById('fCat').addEventListener('change',e=>{state.cat=e.target.value;state.page=1;renderTable();});
+  document.getElementById('fStatus').addEventListener('change',e=>{state.status=e.target.value;state.page=1;renderTable();});
+  document.getElementById('fLevel').addEventListener('change',e=>{state.level=e.target.value;state.page=1;renderTable();});
   document.getElementById('roleSel').addEventListener('change',e=>{state.role=e.target.value;applyPerm();});
   document.getElementById('addBtn').addEventListener('click',doAdd);
   /* 评测推荐标记筛选 */
-  document.getElementById('fRec').addEventListener('change',e=>{state.rec=e.target.value;renderTable();});
+  document.getElementById('fRec').addEventListener('change',e=>{state.rec=e.target.value;state.page=1;renderTable();});
   /* 批量勾选：行勾选 / 表头全选与半选 */
   document.getElementById('tbody').addEventListener('change',e=>{
     const ck=e.target.closest('.row-ck'); if(!ck) return;
@@ -777,6 +841,14 @@ function bind(){
   ths.addEventListener('keydown',e=>{
     if(e.key==='Enter'||e.key===' '){ e.preventDefault(); setSort('submit'); }
   });
+  /* 分页器：上一页 / 下一页 / 每页条数 */
+  const pgPrev=document.getElementById('pgPrev'), pgNext=document.getElementById('pgNext'), pgSize=document.getElementById('pgSize');
+  if(pgPrev) pgPrev.addEventListener('click',()=>{ if(state.page>1){ state.page--; renderTable(); } });
+  if(pgNext) pgNext.addEventListener('click',()=>{ state.page++; renderTable(); });
+  if(pgSize) pgSize.addEventListener('change',e=>{ state.pageSize=parseInt(e.target.value,10)||5; state.page=1; renderTable(); });
+  /* 取消选择：清空勾选集合并重渲染 */
+  const clearSel=document.getElementById('clearSelBtn');
+  if(clearSel) clearSel.addEventListener('click',()=>{ state.sel.clear(); renderTable(); });
   document.getElementById('sbToggle').addEventListener('click',()=>{
     const sb=document.getElementById('sidebar'); sb.classList.toggle('collapsed');
     document.getElementById('sbToggle').textContent=sb.classList.contains('collapsed')?'⟩':'⟨';
