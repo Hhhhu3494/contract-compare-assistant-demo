@@ -153,6 +153,26 @@
   .table-scroll th{white-space:nowrap;}          /* 9 列下表头不折行 */
   .table-scroll td.code{white-space:nowrap;}     /* 样本编号 / 来源合同保持单行 */
   .table-scroll .clamp{max-width:220px;}         /* 长文本列让出宽度，避免挤压短列 */
+
+  /* ===== 仅新增功能：评测推荐标记 + 批量导入评测集（不动原有样式/逻辑/色彩） ===== */
+  .ck-col{width:34px;text-align:center;}
+  .ck-cell{text-align:center;width:34px;}
+  .rec-flag{font-size:12px;color:var(--ink-3);}            /* 灰字小注：无底色、无彩色标签 */
+  .batchbar{display:flex;align-items:center;gap:12px;margin:6px 0 12px;}
+  .batchbar .sel-count{font-size:12px;color:var(--ink-2);}
+  .batchbar .lock-note{color:var(--ink-3);}
+  .dd{position:relative;display:inline-block;}
+  .dd-menu{position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid var(--line);border-radius:6px;min-width:196px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:40;padding:4px;}
+  .dd-item{padding:9px 12px;font-size:13px;color:var(--ink-1);cursor:pointer;border-radius:4px;white-space:nowrap;}
+  .dd-item:hover{background:var(--bg);}
+  .dd-item.disabled{color:var(--ink-3);cursor:not-allowed;}
+  .dd-item.disabled:hover{background:transparent;}
+  .note-warn{background:#FFF7E8;color:#D25F00;border:1px solid #FFD9A8;border-radius:6px;padding:8px 12px;font-size:12px;line-height:1.7;margin:12px 0;}
+  .imp-list{max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:6px;margin:12px 0;}
+  .imp-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer;}
+  .imp-item:last-child{border-bottom:none;}
+  .imp-item .meta{color:var(--ink-3);font-size:12px;white-space:nowrap;}
+  .imp-item .code{white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -261,18 +281,37 @@
             <option value="mid">中风险</option>
             <option value="low">低风险</option>
           </select>
+          <select class="f-select" id="fRec">
+            <option value="">全部推荐标记</option>
+            <option value="rec">已推荐</option>
+            <option value="unrec">未推荐</option>
+          </select>
           <div class="spacer"></div>
           <button class="btn btn-primary mgr-only" id="addBtn">＋ 新增样本</button>
         </div>
 
         <!-- 样本列表 -->
         <div class="sec-title"><span class="line"></span>风险样本列表</div>
+        <!-- 批量操作条（表格顶部）：单条/批量勾选后可用；法务、管理员均可见可用 -->
+        <div class="batchbar">
+          <span class="sel-count" id="p9selCount" style="display:none;">已选 <b id="p9selNum">0</b> 条</span>
+          <div class="dd" id="batchDD">
+            <button class="btn" id="batchDDToggle" aria-haspopup="true" aria-expanded="false">批量操作 ▾</button>
+            <div class="dd-menu" id="batchMenu" style="display:none;">
+              <div class="dd-item" id="ddMark">批量标记推荐评测</div>
+              <div class="dd-item" id="ddImport">批量导入评测集</div>
+            </div>
+          </div>
+          <span class="lock-note" id="batchHint">勾选样本后可批量标记推荐 / 导入评测集</span>
+        </div>
         <div class="card table-scroll">
           <table>
             <thead>
               <tr>
+                <th class="ck-col"><input type="checkbox" id="checkAll" aria-label="全选当前列表样本"></th>
                 <th>样本编号</th><th>风险分类</th><th>等级</th><th>风险原文（概要）</th>
                 <th>入库状态</th><th>来源合同</th><th>管控说明</th>
+                <th>评测推荐标记</th>
                 <th data-sort="submit" id="thSubmit" tabindex="0" role="button" aria-sort="descending" title="点击切换提报时间排序">提报时间<span class="sort-ico" id="submitInd">▼</span></th>
                 <th>操作</th>
               </tr>
@@ -291,6 +330,13 @@
   <div class="modal-box">
     <button class="modal-close" onclick="closeModal('detailMask')" aria-label="关闭">×</button>
     <div class="modal" id="detailBody"></div>
+  </div>
+</div>
+<!-- 批量导入评测集确认弹窗 -->
+<div class="modal-mask" id="importMask">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('importMask')" aria-label="关闭">×</button>
+    <div class="modal" id="importBody"></div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -380,8 +426,8 @@ const SAMPLES = [
 ];
 
 /* 提报时间默认倒序：打开页面即显示最新提报的样本与 ▼ 指示器 */
-const state = { role:'legal', kw:'', cat:'', status:'', level:'', clause:'',
-  sortKey:'submit', sortDir:'desc' };
+const state = { role:'legal', kw:'', cat:'', status:'', level:'', clause:'', rec:'',
+  sel:new Set(), sortKey:'submit', sortDir:'desc' };
 
 /* ============ 接收【页面12】负责人审核通过的样本 ============
    仅加载「带审核人 + 审核时间 + 样本入库留痕」的记录；页面5 从不写此 key，故不存在自动入库。 */
@@ -453,6 +499,8 @@ function filtered(){
     if(state.status && s.status!==state.status) return false;
     if(state.level && s.level!==state.level) return false;
     if(state.clause && s.clause!==state.clause) return false;
+    if(state.rec==='rec' && !s.recommended) return false;
+    if(state.rec==='unrec' && s.recommended) return false;
     if(kw && !(s.orig.toLowerCase().includes(kw)||s.id.toLowerCase().includes(kw)||s.contract.toLowerCase().includes(kw))) return false;
     return true;
   });
@@ -482,6 +530,7 @@ function renderTable(){
   document.getElementById('emptyTip').style.display='none';
   tb.innerHTML=list.map(s=>{
     return '<tr>'+
+      '<td class="ck-cell"><input type="checkbox" class="row-ck" data-id="'+s.id+'"'+(state.sel.has(s.id)?' checked':'')+' aria-label="选择样本 '+s.id+'"></td>'+
       '<td class="code">'+s.id+'</td>'+
       '<td><span class="tag t-cat">'+s.cat+'</span></td>'+
       '<td><span class="tag '+RISK_TAG[s.level]+' t-risk">'+RISK_LABEL[s.level]+'</span></td>'+
@@ -489,15 +538,18 @@ function renderTable(){
       '<td><span class="tag '+STATUS_TAG[s.status]+'">'+STATUS_LABEL[s.status]+'</span></td>'+
       '<td class="code">'+s.contract+'</td>'+
       '<td><div class="clamp">'+s.ctrl+'</div></td>'+
+      '<td>'+(s.recommended?'<span class="rec-flag">已推荐</span>':'')+'</td>'+
       '<td>'+submitCell(s)+'</td>'+
       '<td>'+opBtns(s)+'</td>'+
     '</tr>';
   }).join('');
+  updateP9SelUI();
 }
 function opBtns(s){
   let h='';
   h+='<button class="btn btn-sm" onclick="openDetail(\''+s.id+'\')">查看详情</button>';
   h+='<button class="btn btn-sm btn-primary" onclick="traceOriginalCase(\''+s.id+'\')">溯源原始案例</button>';
+  h+='<button class="btn btn-sm" onclick="toggleRec(\''+s.id+'\')">'+(s.recommended?'取消推荐':'推荐评测')+'</button>';
   if(state.role==='admin'){
     if(s.status==='draft') h+='<button class="btn btn-sm" onclick="doSubmit(\''+s.id+'\')">直接入库</button>';
     if(s.status==='pending'){ h+='<button class="btn btn-sm btn-primary" onclick="doApprove(\''+s.id+'\')">审批入库</button>'; h+='<button class="btn btn-sm" onclick="doReject(\''+s.id+'\')">驳回</button>'; }
@@ -587,6 +639,98 @@ function applyPerm(){
   renderAll();
 }
 
+/* ============ 仅新增功能：评测推荐标记 + 批量导入评测集 ============
+   约束：法务 / 管理员可见可用；推荐评测只是线索标记（非审核状态、非真值结果），无强高亮、无彩色标签。
+   跨页共享：
+     CLM_RISK_LIB_V1      —— 风险样本 + 推荐标记（页面9 写、页面10 读，用于「从风险条款库导入」）
+     CLM_EVAL_IMPORTED_V1 —— 导入评测集的样本副本（页面9/10 均写入，页面10 初始化合并）
+     CLM_EVAL_IMPORT_LOG_V1 —— 导入操作日志（操作人 / 时间 / 样本清单，永久留存可追溯） */
+const RISK_LIB_KEY='CLM_RISK_LIB_V1';
+const EVAL_IMPORT_KEY='CLM_EVAL_IMPORTED_V1';
+const EVAL_IMPORT_LOG='CLM_EVAL_IMPORT_LOG_V1';
+const SRC_LIB_LABEL='来自风险条款库';
+
+function saveRiskLib(){
+  const lib=SAMPLES.map(s=>({id:s.id,cat:s.cat,level:s.level,status:s.status,clause:s.clause,orig:s.orig,contract:s.contract,srcCase:s.srcCase,recommended:!!s.recommended,submitTime:s.submitTime||''}));
+  try{ localStorage.setItem(RISK_LIB_KEY, JSON.stringify(lib)); }catch(e){}
+}
+function loadRiskLibRec(){           // 恢复推荐标记（同会话 / 跨刷新）
+  try{
+    const lib=JSON.parse(localStorage.getItem(RISK_LIB_KEY)||'[]');
+    if(!Array.isArray(lib)) return;
+    lib.forEach(x=>{ const s=SAMPLES.find(y=>y.id===x.id); if(s) s.recommended=!!x.recommended; });
+  }catch(e){}
+}
+/* 推荐评测：线索标记，仅置 recommended 标志并存共享库；不改变入库状态/真值 */
+function toggleRec(id){
+  const s=findS(id); if(!s) return;
+  s.recommended=!s.recommended;
+  saveRiskLib();
+  toast(s.recommended?'已标记推荐评测：'+s.id:'已取消推荐：'+s.id);
+  renderTable();
+}
+/* 批量导入评测集：复制样本副本送入评测集，原样本留在风险条款库；
+   仅同步基础信息，禁止带入相似度 / 系统预判结果（保障双盲）；写入操作日志 */
+function performImport(samples, role){
+  const imported=JSON.parse(localStorage.getItem(EVAL_IMPORT_KEY)||'[]');
+  const have=new Set(imported.map(x=>x.id));
+  const added=[];
+  (samples||[]).forEach(rs=>{
+    const evId='EV-RS-'+rs.id;
+    if(have.has(evId)) return;                                  // 去重：已导入的跳过
+    added.push({
+      id:evId, type:'黄金标注', clause:(rs.orig||rs.clause||''),
+      golden:{status:'same',risk:'none'}, sys:{status:'same',risk:'none'},  // 中性占位，不带入系统预判
+      srcCase:rs.srcCase||'d1', source:SRC_LIB_LABEL, created:nowStr(),
+      riskSampleId:rs.id, riskStatus:'active', stdClause:rs.clause||'', fromRiskImport:true
+    });
+  });
+  if(!added.length){ toast('所选样本均已导入评测集，未重复导入'); return; }
+  try{ localStorage.setItem(EVAL_IMPORT_KEY, JSON.stringify(imported.concat(added))); }catch(e){}
+  const log=JSON.parse(localStorage.getItem(EVAL_IMPORT_LOG)||'[]');
+  log.push({time:nowStr(), operator:(ROLE_LABEL[role]||role), count:added.length,
+    samples:added.map(x=>{ const rs=(samples||[]).find(r=>('EV-RS-'+r.id)===x.id); return {evalId:x.id, riskId:(rs?rs.id:''), clause:x.clause, cat:(rs?rs.cat:''), level:(rs?rs.level:'')}; })});
+  try{ localStorage.setItem(EVAL_IMPORT_LOG, JSON.stringify(log)); }catch(e){}
+  toast('已导入 '+added.length+' 条样本至评测集（来自风险条款库）');
+}
+
+/* 批量选择 UI 状态 */
+function selectedActive(){ return SAMPLES.filter(s=>state.sel.has(s.id) && s.status==='active'); }
+function updateP9SelUI(){
+  const n=state.sel.size;
+  const c=document.getElementById('p9selCount'), num=document.getElementById('p9selNum');
+  if(c) c.style.display=n?'inline':'none';
+  if(num) num.textContent=n;
+  const mark=document.getElementById('ddMark');
+  if(mark) mark.classList.toggle('disabled', n===0);
+  const imp=document.getElementById('ddImport');
+  if(imp){
+    const invalid = n===0 || ![...state.sel].every(id=>{ const s=findS(id); return s && s.status==='active'; });
+    imp.classList.toggle('disabled', invalid);   // 含「待审批」等非启用样本 → 置灰不可点
+    imp.title = invalid ? '仅「已入库·启用」样本可导入；待审批等状态禁止导入' : '将选中的已启用样本导入评测集';
+  }
+}
+/* 批量导入确认弹窗（含引导提示 + 数量） */
+function openImportConfirm(samples){
+  const body=document.getElementById('importBody');
+  const items=samples.map(s=>'<div class="imp-item"><span class="code">'+s.id+'</span><span class="clamp">'+s.orig+'</span><span class="meta">'+RISK_LABEL[s.level]+' · '+s.cat+'</span></div>').join('');
+  body.innerHTML='<h3>批量导入评测集（来自风险条款库）</h3>'+
+    '<div class="note-warn">请优先导入有歧义、容易识别错误的样本，避免大量重复样本灌入评测集。</div>'+
+    '<div>本次将导入 <b>'+samples.length+'</b> 条「已入库·启用」样本（复制副本，原样本保留在风险条款库）：</div>'+
+    '<div class="imp-list">'+items+'</div>'+
+    '<div class="op-row"><button class="btn btn-primary" onclick="doImportConfirm()">确认导入</button><button class="btn" onclick="closeModal(\'importMask\')">取消</button></div>';
+  window.__importPending=samples.map(s=>({id:s.id,orig:s.orig,clause:s.clause,srcCase:s.srcCase,cat:s.cat,level:s.level}));
+  showModal('importMask');
+}
+function doImportConfirm(){
+  const list=window.__importPending||[];
+  if(!list.length){ closeModal('importMask'); return; }
+  performImport(list, state.role);
+  window.__importPending=null;
+  closeModal('importMask');
+  state.sel.clear(); renderAll();
+}
+
 /* 绑定 */
 function bind(){
   document.getElementById('kw').addEventListener('input',e=>{state.kw=e.target.value;renderTable();});
@@ -595,6 +739,38 @@ function bind(){
   document.getElementById('fLevel').addEventListener('change',e=>{state.level=e.target.value;renderTable();});
   document.getElementById('roleSel').addEventListener('change',e=>{state.role=e.target.value;applyPerm();});
   document.getElementById('addBtn').addEventListener('click',doAdd);
+  /* 评测推荐标记筛选 */
+  document.getElementById('fRec').addEventListener('change',e=>{state.rec=e.target.value;renderTable();});
+  /* 批量勾选：行勾选 / 表头全选与半选 */
+  document.getElementById('tbody').addEventListener('change',e=>{
+    const ck=e.target.closest('.row-ck'); if(!ck) return;
+    if(ck.checked) state.sel.add(ck.dataset.id); else state.sel.delete(ck.dataset.id);
+    renderTable();
+  });
+  document.getElementById('checkAll').addEventListener('change',e=>{
+    const rows=document.querySelectorAll('#tbody .row-ck');
+    rows.forEach(x=>{ if(e.target.checked) state.sel.add(x.dataset.id); else state.sel.delete(x.dataset.id); });
+    renderTable();
+  });
+  /* 批量操作下拉：开合 */
+  const ddToggle=document.getElementById('batchDDToggle'), ddMenu=document.getElementById('batchMenu');
+  ddToggle.addEventListener('click',e=>{ e.stopPropagation(); const open=ddMenu.style.display!=='none'; ddMenu.style.display=open?'none':'block'; ddToggle.setAttribute('aria-expanded',open?'false':'true'); });
+  document.addEventListener('click',e=>{ if(!e.target.closest('#batchDD')){ ddMenu.style.display='none'; ddToggle.setAttribute('aria-expanded','false'); } });
+  /* 批量标记推荐评测：仅对勾选样本置 recommended */
+  document.getElementById('ddMark').addEventListener('click',()=>{
+    if(!state.sel.size){ toast('请先勾选样本'); return; }
+    state.sel.forEach(id=>{ const s=findS(id); if(s) s.recommended=true; });
+    saveRiskLib(); toast('已批量标记推荐评测：'+state.sel.size+' 条'); renderTable();
+  });
+  /* 批量导入评测集：仅「已入库·启用」可导入；待审批等禁止 */
+  document.getElementById('ddImport').addEventListener('click',()=>{
+    if(!state.sel.size){ toast('请先勾选样本'); return; }
+    const pending=[...state.sel].some(id=>{ const s=findS(id); return s && s.status!=='active'; });
+    if(pending){ toast('含「待审批 / 草稿 / 停用」样本，禁止导入；请仅勾选「已入库·启用」样本'); return; }
+    const sel=selectedActive();
+    if(!sel.length){ toast('所选样本均非「已入库·启用」，无法导入'); return; }
+    openImportConfirm(sel);
+  });
   /* 提报时间排序：点击 / 键盘 Enter、Space */
   const ths=document.getElementById('thSubmit');
   ths.addEventListener('click',()=>setSort('submit'));
@@ -622,6 +798,8 @@ function bind(){
   if(r&&['procurement','legal','admin'].includes(r)){ state.role=r; document.getElementById('roleSel').value=r; }
   const cid=p.get('clauseId');
   mergeApprovedSamples(); // 先加载审核通过的入库样本，再渲染统计与列表
+  loadRiskLibRec();       // 恢复推荐标记（同会话 / 跨刷新）
+  saveRiskLib();          // 落共享库，供页面10「从风险条款库导入」读取 active+已推荐 样本
   applyPerm(); bind();
   if(cid) applyClauseFilter(cid);
 })();

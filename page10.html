@@ -196,6 +196,13 @@
   .t-truth{background:var(--review-bg);color:var(--review-text);border:1px solid var(--review-bd);}
   .btn-launch{color:var(--review-text);border-color:var(--review-bd);}
   .btn-launch:hover{background:#FBF6FF;color:var(--review-text);border-color:var(--review-bd);}
+  /* ===== 仅新增功能：从风险条款库导入弹窗（不动原有样式/色彩） ===== */
+  .note-warn{background:#FFF7E8;color:#D25F00;border:1px solid #FFD9A8;border-radius:6px;padding:8px 12px;font-size:12px;line-height:1.7;margin:12px 0;}
+  .imp-list{max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:6px;margin:12px 0;}
+  .imp-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer;}
+  .imp-item:last-child{border-bottom:none;}
+  .imp-item .meta{color:var(--ink-3);font-size:12px;white-space:nowrap;}
+  .imp-item .code{white-space:nowrap;}
   /* 操作列三按钮纵向堆叠：固定窄列宽，避免 10 列表格其余列被挤压折行 */
   .table-scroll .op{max-width:140px;flex-direction:column;align-items:flex-start;gap:4px;}
   .table-scroll .op .btn{width:100%;text-align:left;white-space:nowrap;}
@@ -328,6 +335,7 @@
           <button class="btn" id="batchBtn" disabled title="勾选任一条后，可一键选中当前筛选结果的全部样本（含其他页）">批量选择</button>
           <button class="btn" id="clearSelBtn" style="display:none;">取消选择</button>
           <button class="btn" id="exportBtn">导出评测集</button>
+          <button class="btn" id="importRiskBtn">从风险条款库导入</button>
         </div>
         <div class="card table-scroll">
           <table>
@@ -356,6 +364,13 @@
   <div class="modal-box">
     <button class="modal-close" onclick="closeModal('runMask')" aria-label="关闭">×</button>
     <div class="modal" id="runBody"></div>
+  </div>
+</div>
+<!-- 从风险条款库导入弹窗 -->
+<div class="modal-mask" id="riskImportMask">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('riskImportMask')" aria-label="关闭">×</button>
+    <div class="modal" id="riskImportBody"></div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -464,6 +479,71 @@ function enterArbitration(id){
     const e=EVALS.find(x=>x.id===id); if(e) q.set('diff',e.srcCase||'d1');
   }
   window.location.href='page14.html?'+q.toString();
+}
+
+/* ============ 仅新增功能：从风险条款库导入（不动原有按钮/字段/状态/颜色） ============
+   读取页面9 共享库 CLM_RISK_LIB_V1 中「已入库·启用 + 已推荐」样本；导入副本写 CLM_EVAL_IMPORTED_V1，
+   初始化时合并进 EVALS；操作日志写 CLM_EVAL_IMPORT_LOG_V1（操作人 / 时间 / 样本清单，永久留存可追溯）。 */
+const RISK_LIB_KEY_P10='CLM_RISK_LIB_V1';
+const EVAL_IMPORT_KEY_P10='CLM_EVAL_IMPORTED_V1';
+const EVAL_IMPORT_LOG_P10='CLM_EVAL_IMPORT_LOG_V1';
+function escR(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function performImportP10(samples, role){
+  const imported=JSON.parse(localStorage.getItem(EVAL_IMPORT_KEY_P10)||'[]');
+  const have=new Set(imported.map(x=>x.id));
+  const added=[];
+  (samples||[]).forEach(rs=>{
+    const evId='EV-RS-'+rs.id;
+    if(have.has(evId)) return;                                          // 去重：已导入的跳过
+    added.push({
+      id:evId, type:'黄金标注', clause:(rs.orig||rs.clause||''),
+      golden:{status:'same',risk:'none'}, sys:{status:'same',risk:'none'},   // 中性占位，不带入系统预判（双盲）
+      srcCase:rs.srcCase||'d1', source:SRC_LIB, created:nowStr(),
+      riskSampleId:rs.id, riskStatus:'active', stdClause:rs.clause||'', fromRiskImport:true
+    });
+  });
+  if(!added.length){ toast('所选样本均已导入评测集，未重复导入'); return; }
+  try{ localStorage.setItem(EVAL_IMPORT_KEY_P10, JSON.stringify(imported.concat(added))); }catch(e){}
+  const log=JSON.parse(localStorage.getItem(EVAL_IMPORT_LOG_P10)||'[]');
+  log.push({time:nowStr(), operator:(ROLE_LABEL[role]||role), count:added.length,
+    samples:added.map(x=>{ const rs=(samples||[]).find(r=>('EV-RS-'+r.id)===x.id); return {evalId:x.id, riskId:(rs?rs.id:''), clause:x.clause, cat:(rs?rs.cat:''), level:(rs?rs.level:'')}; })});
+  try{ localStorage.setItem(EVAL_IMPORT_LOG_P10, JSON.stringify(log)); }catch(e){}
+  toast('已导入 '+added.length+' 条样本至评测集（来自风险条款库）');
+}
+function mergeImportedEval(){
+  let arr=[]; try{ arr=JSON.parse(localStorage.getItem(EVAL_IMPORT_KEY_P10)||'[]'); }catch(e){}
+  if(!Array.isArray(arr)) return;
+  arr.forEach(x=>{ if(!EVALS.some(e=>e.id===x.id)) EVALS.push(x); });
+}
+function openRiskImport(){
+  if(state.role==='procurement'){ toast('采购专员无导入权限'); return; }
+  let lib=[]; try{ lib=JSON.parse(localStorage.getItem(RISK_LIB_KEY_P10)||'[]'); }catch(e){}
+  if(!Array.isArray(lib)) lib=[];
+  const cand=lib.filter(x=>x.status==='active' && x.recommended);
+  const body=document.getElementById('riskImportBody');
+  if(!cand.length){
+    body.innerHTML='<h3>从风险条款库导入</h3>'+
+      '<div class="note-warn">请优先导入有歧义、容易识别错误的样本，避免大量重复样本灌入评测集。</div>'+
+      '<div class="empty">暂无符合条件的样本：需为「已入库·启用」且已标记「推荐评测」（请在风险条款库操作）。</div>'+
+      '<div class="op-row"><button class="btn" onclick="closeModal(\'riskImportMask\')">关闭</button></div>';
+    showModal('riskImportMask'); return;
+  }
+  const items=cand.map(x=>'<label class="imp-item"><input type="checkbox" class="ri-ck" data-id="'+escR(x.id)+'" checked><span class="code">'+escR(x.id)+'</span><span class="clamp">'+escR(x.orig||x.clause||'')+'</span><span class="meta">'+escR(x.cat)+' · '+(RISK_LABEL[x.level]||x.level)+'</span></label>').join('');
+  body.innerHTML='<h3>从风险条款库导入评测集</h3>'+
+    '<div class="note-warn">请优先导入有歧义、容易识别错误的样本，避免大量重复样本灌入评测集。</div>'+
+    '<div>勾选需导入的「已入库·启用 + 已推荐」样本（复制副本，原样本保留在风险条款库；仅同步基础信息，不带入相似度 / 系统预判，保障双盲）：</div>'+
+    '<div class="imp-list">'+items+'</div>'+
+    '<div class="op-row"><button class="btn btn-primary" onclick="doRiskImport()">确认导入</button><button class="btn" onclick="closeModal(\'riskImportMask\')">取消</button></div>';
+  showModal('riskImportMask');
+}
+function doRiskImport(){
+  const ids=[...document.querySelectorAll('#riskImportBody .ri-ck:checked')].map(c=>c.dataset.id);
+  if(!ids.length){ toast('请至少勾选一个样本'); return; }
+  let lib=[]; try{ lib=JSON.parse(localStorage.getItem(RISK_LIB_KEY_P10)||'[]'); }catch(e){}
+  const pick=(lib||[]).filter(x=>ids.includes(x.id));
+  performImportP10(pick, state.role);
+  closeModal('riskImportMask');
+  mergeImportedEval(); renderAll();
 }
 
 /* 页面14 提交的真值回写结果：人工真值 × 工单创建时冻结的模型初判快照 */
@@ -851,6 +931,7 @@ function bind(){
   document.getElementById('roleSel').addEventListener('change',e=>{state.role=e.target.value;applyPerm();renderTable();});
   document.getElementById('runBtn').addEventListener('click',()=>{ if(state.role==='procurement'){toast('采购专员无评测权限');return;} runEval(); });
   document.getElementById('exportBtn').addEventListener('click',()=>{ if(state.role==='procurement'){toast('采购专员无导出权限');return;} doExport(); });
+  document.getElementById('importRiskBtn').addEventListener('click',()=>{ if(state.role==='procurement'){toast('采购专员无导入权限');return;} openRiskImport(); });
   /* 批量选择：行勾选 / 表头全选与半选 / 批量选择 / 取消选择 */
   document.getElementById('tbody').addEventListener('change',e=>{
     const ck=e.target.closest('.row-ck'); if(!ck) return;
@@ -913,6 +994,7 @@ function bind(){
   mergeTruthSamples();
   bindLibSamples();      // 关联风险条款库已启用入库样本（入口1 约束）
   mergeTruthResults();   // 页面14 回写的人工真值 → 更新黄金标注 / 系统初判 / 指标
+  mergeImportedEval();   // 合并此前从风险条款库导入的评测集样本（CLM_EVAL_IMPORTED_V1）
   renderMetrics(); renderRecs(); renderTable(); renderTruthBanner(); renderTruthLink(); applyPerm(); bind();
 })();
 </script>
