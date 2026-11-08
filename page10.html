@@ -443,7 +443,8 @@ function loadWOs(){ try{ return JSON.parse(localStorage.getItem(WO_KEY)||'[]'); 
 function woAnyForSample(id){ return loadWOs().find(w=>w.sampleId===id)||null; }
 function woActiveForSample(id){ return loadWOs().find(w=>w.sampleId===id && (w.status==='blind'||w.status==='arb'))||null; }
 function sampleStatusKey(e){
-  if(woActiveForSample(e.id)) return 'review';                                   // 已发起双盲复核，工单流转处理中
+  if(woActiveForSample(e.id)) return 'review';                                   // 真实工单流转中（页面14 统一双盲工单 CLM_TRUTH_WO_V1）
+  if(e.woStatus==='blind'||e.woStatus==='arb') return 'review';                  // 评测集种子演示态：已发起双盲复核（无真实工单时静态展示，便于审阅四种状态）
   if(e.truthLabeled) return (e.golden.status===e.sys.status && e.golden.risk===e.sys.risk)?'truth_effective':'truth_arb';
   return 'no_truth';                                                             // 人工真值为空，暂无标准答案
 }
@@ -503,9 +504,9 @@ const EVALS = [
   {id:'EV-003', type:'黄金标注', clause:'5.3 违约责任',       golden:{status:'del',risk:'high'}, sys:{status:'del',risk:'high'},  srcCase:'d3', source:SRC_MINE, created:'2026-09-15 10:42'}, // 自动挖掘：违约赔偿上限边界样本
   {id:'EV-004', type:'黄金标注', clause:'6.1 保密义务',       golden:{status:'add',risk:'low'},  sys:{status:'add',risk:'low'},  srcCase:'d4', source:SRC_LIB, created:'2026-09-28 16:18'},
   {id:'EV-005', type:'黄金标注', clause:'7.2 交付地点',       golden:{status:'mod',risk:'mid'},  sys:{status:'mod',risk:'mid'},  srcCase:'d5', source:SRC_LIB, created:'2026-10-09 11:07'},
-  {id:'EV-006', type:'黄金标注', clause:'8.4 知识产权',       golden:{status:'same',risk:'none'}, sys:{status:'mod',risk:'mid'},  srcCase:'d6', source:SRC_MINE, created:'2026-10-17 15:33'}, // 自动挖掘难例：误报
-  {id:'EV-007', type:'黄金标注', clause:'9.1 不可抗力',       golden:{status:'del',risk:'high'}, sys:{status:'same',risk:'none'}, srcCase:'d7', source:SRC_MINE, created:'2026-10-26 09:48'}, // 自动挖掘难例：漏检
-  {id:'EV-008', type:'黄金标注', clause:'10.2 争议管辖',      golden:{status:'add',risk:'low'},  sys:{status:'add',risk:'low'},  srcCase:'d8', source:SRC_LIB, created:'2026-11-04 13:26'}
+  {id:'EV-006', type:'黄金标注', clause:'8.4 知识产权',       golden:{status:'del',risk:'high'}, sys:{status:'add',risk:'low'},  srcCase:'d6', source:SRC_MINE, created:'2026-10-17 15:33', truthLabeled:true}, // 演示种子态：真值待仲裁（人工真值存在，模型与真值不匹配）
+  {id:'EV-007', type:'黄金标注', clause:'9.1 不可抗力',       golden:{status:'mod',risk:'mid'},  sys:{status:'mod',risk:'mid'},  srcCase:'d7', source:SRC_MINE, created:'2026-10-26 09:48', truthLabeled:true}, // 演示种子态：真值已生效（人工真值与系统初判一致）
+  {id:'EV-008', type:'黄金标注', clause:'10.2 争议管辖',      golden:{status:'add',risk:'low'},  sys:{status:'add',risk:'low'},  srcCase:'d8', source:SRC_LIB, created:'2026-11-04 13:26', woStatus:'blind'} // 演示种子态：复核中（已发起双盲复核，工单流转中）
 ];
 
 // 系统自动挖掘的推荐样本（尚未加入评测集）
