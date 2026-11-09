@@ -449,7 +449,45 @@ const SAMPLES = [
    basis:'规则 R-11 命中：数量浮动条款',
    contract:'HT-SUP-2026-001', srcCase:'d6', submitTime:'2026-10-26 15:50',
    ctrl:'沉淀为低风险样本，作为弹性条款基准',
-   version:['V1.0 初版沉淀（2026-10-26）']}
+   version:['V1.0 初版沉淀（2026-10-26）']},
+
+  /* 演示种子：历史 AI 识别结果反馈归集样本（与页面5 提交后 mergeFeedbackSamples 的产物同构）
+     后台标记 fromFeedback / sampleSource 只作【样本来源】筛选依据，不新增列、不在行内展示标签；
+     反馈明细留在独立 feedback* 字段，不混入 ctrl（风险处置意见），也不改动模型 / 标准条款库 / 差异初判。
+     状态一律「待审批」，沿用原有审批 → 推荐评测 → 导入评测集 → 双盲复核链路。 */
+  {id:'RS-FB-d3', cat:'法务合规类', level:'mid', status:'pending', clause:'—',
+   orig:'第3.1条 · 配对错误（待人工复核）',
+   miss:'AI 识别结果反馈线索，待人工复核评估',
+   basis:'AI 识别结果反馈：配对错误；仅作归集线索，不作为真值',
+   contract:'HT-SUP-2026-001', srcCase:'d3', submitTime:'2026-10-31 14:20',
+   ctrl:'按原流程复核：可推荐评测，审批通过后导入评测集走双盲复核',
+   version:['V1.0 由 AI 识别结果反馈归集（2026-10-31 14:20）'],
+   fromFeedback:true, sampleSource:'feedback',
+   feedbackId:'FB-2026-1031-01', feedbackKind:'pair_wrong', feedbackKindLabel:'配对错误',
+   feedbackNote:'匹配到错误的标准条款，疑似应对应 CL-002', feedbackTime:'2026-10-31 14:20',
+   recommended:false},
+  {id:'RS-FB-d5', cat:'交付类', level:'mid', status:'pending', clause:'—',
+   orig:'第7.2条 · 误报（待人工复核）',
+   miss:'AI 识别结果反馈线索，待人工复核评估',
+   basis:'AI 识别结果反馈：误报；仅作归集线索，不作为真值',
+   contract:'HT-SUP-2026-002', srcCase:'d5', submitTime:'2026-10-30 11:05',
+   ctrl:'按原流程复核：可推荐评测，审批通过后导入评测集走双盲复核',
+   version:['V1.0 由 AI 识别结果反馈归集（2026-10-30 11:05）'],
+   fromFeedback:true, sampleSource:'feedback',
+   feedbackId:'FB-2026-1030-01', feedbackKind:'false_positive', feedbackKindLabel:'误报',
+   feedbackNote:'', feedbackTime:'2026-10-30 11:05',
+   recommended:false},
+  {id:'RS-FB-d9', cat:'供应类', level:'mid', status:'pending', clause:'—',
+   orig:'第9.4条 · 漏识别（待人工复核）',
+   miss:'AI 识别结果反馈线索，待人工复核评估',
+   basis:'AI 识别结果反馈：漏识别；仅作归集线索，不作为真值',
+   contract:'HT-SUP-2026-003', srcCase:'d9', submitTime:'2026-10-29 16:42',
+   ctrl:'按原流程复核：可推荐评测，审批通过后导入评测集走双盲复核',
+   version:['V1.0 由 AI 识别结果反馈归集（2026-10-29 16:42）'],
+   fromFeedback:true, sampleSource:'feedback',
+   feedbackId:'FB-2026-1029-01', feedbackKind:'missed', feedbackKindLabel:'漏识别',
+   feedbackNote:'另有差异未被检出', feedbackTime:'2026-10-29 16:42',
+   recommended:false}
 ];
 
 /* 提报时间默认倒序：打开页面即显示最新提报的样本与 ▼ 指示器 */
