@@ -295,6 +295,10 @@
             <option value="rec">已推荐</option>
             <option value="unrec">未推荐</option>
           </select>
+          <select class="f-select" id="fSource" title="样本来源 = 入库渠道（是否来自法务在比对页提交的 AI 识别反馈）；与【来源合同】= 原始合同编号 含义不同">
+            <option value="">全部样本来源</option>
+            <option value="feedback">用户反馈样本</option>
+          </select>
           <div class="spacer"></div>
           <button class="btn btn-primary mgr-only" id="addBtn">＋ 新增样本</button>
           <!-- 批量操作（与筛选框同行，最右） -->
@@ -381,6 +385,8 @@ const NAV = {
 const ROLE_LABEL = {procurement:'采购专员（无访问权限）', legal:'法务审核员（可提报 / 查看）', admin:'管理员（可审批 / 启停 / 管理）'};
 
 const RISK_LABEL={high:'高风险',mid:'中风险',low:'低风险',none:'无风险'};
+/* 列表等级标签收敛为「高 / 中 / 低」；详情弹窗、导入确认弹窗与筛选下拉仍沿用 RISK_LABEL 原文案（最小改动） */
+const RISK_LABEL_LIST={high:'高',mid:'中',low:'低',none:'无风险'};
 const RISK_TAG={high:'t-high',mid:'t-mid',low:'t-low',none:'t-none'};
 const STATUS_LABEL={draft:'草稿',pending:'待审批',active:'已入库·启用',disabled:'已入库·停用'};
 const STATUS_TAG={draft:'t-draft',pending:'t-pending',active:'t-active',disabled:'t-disabled'};
@@ -447,7 +453,7 @@ const SAMPLES = [
 ];
 
 /* 提报时间默认倒序：打开页面即显示最新提报的样本与 ▼ 指示器 */
-const state = { role:'legal', kw:'', cat:'', status:'', level:'', clause:'', rec:'',
+const state = { role:'legal', kw:'', cat:'', status:'', level:'', clause:'', rec:'', src:'',
   sel:new Set(), sortKey:'submit', sortDir:'desc', page:1, pageSize:5 };
 
 /* ============ 接收【页面12】负责人审核通过的样本 ============
@@ -471,6 +477,42 @@ function mergeApprovedSamples(){
       fromApply:true, fromApplyId:x.applyId, applicant:x.applicant||'', applyTime:x.applyTime||'',
       reviewer:x.reviewer||'', reviewTime:x.reviewTime||'', reviewNote:x.reviewNote||'', logs:x.logs||[],
       submitTime:(x.applyTime||x.reviewTime||'')   // 动态入库样本取入库申请时间作为提报时间
+    });
+  });
+}
+
+/* ============ 新增：AI 识别结果反馈归集（页面5 写 CLM_AI_FEEDBACK_V1，页面9 只读归集） ============
+   反馈仅作线索：不改动模型 / 标准条款库 / 差异初判 / 复核意见。
+   与原有业务备注（ctrl 风险处置意见、reviewNote、入库申请、样本库）分开存储：
+   反馈明细只留在独立 key 与本样本的 feedback* 字段，表格行不展示任何新标签、不新增列。
+   归集样本沿用原有审批链路（待审批 → 审批 → 推荐评测 → 导入评测集 → 双盲复核）。 */
+const AI_FEEDBACK_KEY='CLM_AI_FEEDBACK_V1';
+function mergeFeedbackSamples(){
+  let list=[];
+  try{ const raw=localStorage.getItem(AI_FEEDBACK_KEY); const a=raw?JSON.parse(raw):[]; list=Array.isArray(a)?a:[]; }catch(e){ list=[]; }
+  list.forEach(fb=>{
+    if(!fb || !fb.sampleId) return;
+    const sid=fb.sampleId;
+    if(SAMPLES.some(s=>s.id===sid)){
+      /* 同一差异重复反馈：只更新线索字段，不重复生成样本，也不改动已形成的审批 / 推荐状态 */
+      const s=SAMPLES.find(x=>x.id===sid);
+      s.feedbackKind=fb.kind; s.feedbackKindLabel=fb.kindLabel; s.feedbackNote=fb.note||'';
+      s.feedbackTime=fb.time; s.feedbackId=fb.id;
+      return;
+    }
+    SAMPLES.push({
+      id:sid, cat:'法务合规类', level:'mid', status:'pending', clause:'—',
+      orig:escR(fb.clause||'')+' · '+escR(fb.kindLabel||'AI 识别结果反馈')+'（待人工复核）',
+      miss:'AI 识别结果反馈线索，待人工复核评估',
+      basis:'AI 识别结果反馈：'+escR(fb.kindLabel||'')+'；仅作归集线索，不作为真值',
+      contract:fb.contract||'HT-SUP-2026-001',
+      srcCase:fb.diffId||'', submitTime:fb.time||'',
+      ctrl:'按原流程复核：可推荐评测，审批通过后导入评测集走双盲复核',
+      version:['V1.0 由 AI 识别结果反馈归集（'+(fb.time||'')+'）'],
+      fromFeedback:true, sampleSource:'feedback',
+      feedbackId:fb.id, feedbackKind:fb.kind, feedbackKindLabel:fb.kindLabel,
+      feedbackNote:fb.note||'', feedbackTime:fb.time,
+      recommended:false
     });
   });
 }
@@ -523,6 +565,7 @@ function filtered(){
     if(state.clause && s.clause!==state.clause) return false;
     if(state.rec==='rec' && !s.recommended) return false;
     if(state.rec==='unrec' && s.recommended) return false;
+    if(state.src==='feedback' && !s.fromFeedback) return false;   // 样本来源（入库渠道）筛选，可与其余条件自由组合
     if(kw && !(s.orig.toLowerCase().includes(kw)||s.id.toLowerCase().includes(kw)||s.contract.toLowerCase().includes(kw))) return false;
     return true;
   });
@@ -560,7 +603,7 @@ function renderTable(){
       '<td class="ck-cell"><input type="checkbox" class="row-ck" data-id="'+s.id+'"'+(state.sel.has(s.id)?' checked':'')+' aria-label="选择样本 '+s.id+'"></td>'+
       '<td class="code">'+s.id+'</td>'+
       '<td><span class="tag t-cat">'+s.cat+'</span></td>'+
-      '<td><span class="tag '+RISK_TAG[s.level]+' t-risk">'+RISK_LABEL[s.level]+'</span></td>'+
+      '<td><span class="tag '+RISK_TAG[s.level]+' t-risk">'+RISK_LABEL_LIST[s.level]+'</span></td>'+
       '<td><div class="clamp">'+s.orig+'</div></td>'+
       '<td><span class="tag '+STATUS_TAG[s.status]+'">'+STATUS_LABEL[s.status]+'</span></td>'+
       '<td class="code">'+s.contract+'</td>'+
@@ -804,6 +847,8 @@ function bind(){
   document.getElementById('addBtn').addEventListener('click',doAdd);
   /* 评测推荐标记筛选 */
   document.getElementById('fRec').addEventListener('change',e=>{state.rec=e.target.value;state.page=1;renderTable();});
+  /* 样本来源（入库渠道）筛选：与其余筛选项自由组合，切换后回到第 1 页 */
+  document.getElementById('fSource').addEventListener('change',e=>{state.src=e.target.value;state.page=1;renderTable();});
   /* 批量勾选：行勾选 / 表头全选与半选 */
   document.getElementById('tbody').addEventListener('change',e=>{
     const ck=e.target.closest('.row-ck'); if(!ck) return;
@@ -869,6 +914,7 @@ function bind(){
   if(r&&['procurement','legal','admin'].includes(r)){ state.role=r; document.getElementById('roleSel').value=r; }
   const cid=p.get('clauseId');
   mergeApprovedSamples(); // 先加载审核通过的入库样本，再渲染统计与列表
+  mergeFeedbackSamples(); // 归集 AI 识别结果反馈样本（仅线索，不改变既有样本状态）
   loadRiskLibRec();       // 恢复推荐标记（同会话 / 跨刷新）
   saveRiskLib();          // 落共享库，供页面10「从风险条款库导入」读取 active+已推荐 样本
   applyPerm(); bind();

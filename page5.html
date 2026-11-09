@@ -137,6 +137,22 @@
   .modal h3{margin:0 0 14px;font-size:16px;}
   .modal-close{position:absolute;top:-14px;right:-14px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border:none;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.18);font-size:20px;line-height:1;color:var(--ink-3);cursor:pointer;border-radius:6px;z-index:2;}
   .modal-close:hover{background:#F2F3F5;color:var(--ink-1);}
+  /* 新增：AI 识别结果反馈入口（浅灰小字、无底色 / 无彩色标签）+ 极简弹窗 */
+  .fb-btn{position:relative;margin-left:auto;border:none;background:none;padding:2px 4px;font-size:11px;line-height:18px;color:var(--ink-3);cursor:pointer;white-space:nowrap;text-decoration:underline;text-decoration-color:#C9CDD4;text-underline-offset:2px;}
+  /* 视觉保持浅灰小字，透明伪元素把点击热区扩至 44px（不改变行高 / 布局） */
+  .fb-btn::after{content:"";position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:44px;}
+  .fb-btn:hover{color:var(--ink-2);text-decoration-color:var(--ink-3);}
+  .fb-btn:focus-visible{outline:2px solid var(--brand);outline-offset:1px;border-radius:2px;}
+  .fb-modal{width:min(420px,92vw);}
+  .fb-modal h3{margin:0 0 12px;font-size:15px;}
+  .fb-opts{display:flex;flex-direction:column;gap:6px;}
+  .fb-opt{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;min-height:44px;border:1px solid var(--line);border-radius:4px;font-size:13px;color:var(--ink-1);cursor:pointer;line-height:1.5;}
+  .fb-opt:hover{border-color:var(--brand);}
+  .fb-opt input{margin:3px 0 0;accent-color:var(--brand);flex:0 0 14px;width:14px;height:14px;}
+  .fb-opt:has(input:checked){border-color:var(--brand);background:var(--bg);}
+  .fb-note{width:100%;margin-top:12px;border:1px solid var(--line);border-radius:4px;padding:8px 10px;font-size:13px;color:var(--ink-1);resize:vertical;font-family:inherit;}
+  .fb-note:focus-visible{outline:2px solid var(--brand);outline-offset:1px;}
+  .fb-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;}
   .rep-row{border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin-bottom:10px;}
   .rep-row .rh{display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap;}
   .toast{position:fixed;left:50%;top:64px;transform:translateX(-50%);background:#1D2129;color:#fff;padding:9px 16px;border-radius:6px;font-size:13px;z-index:200;opacity:0;transition:opacity .2s;pointer-events:none;}
@@ -362,6 +378,26 @@
     <div class="modal">
       <h3>复核日志（固化记录）</h3>
       <div id="logBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 新增：AI 识别结果反馈（极简：3 个单选 + 可选备注） -->
+<div class="modal-mask" id="fbMask">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('fbMask')" aria-label="关闭">×</button>
+    <div class="modal fb-modal" role="dialog" aria-modal="true" aria-labelledby="fbTitle">
+      <h3 id="fbTitle">AI 识别结果反馈</h3>
+      <div class="fb-opts">
+        <label class="fb-opt"><input type="radio" name="fbKind" value="pair_wrong"><span>配对错误：匹配到错误的标准条款</span></label>
+        <label class="fb-opt"><input type="radio" name="fbKind" value="false_positive"><span>误报：本条不存在风险 / 差异，不该识别</span></label>
+        <label class="fb-opt"><input type="radio" name="fbKind" value="missed"><span>漏识别：存在其他差异没有被 AI 检出</span></label>
+      </div>
+      <textarea class="fb-note" id="fbNote" rows="2" placeholder="备注（选填）" aria-label="备注（选填）"></textarea>
+      <div class="fb-actions">
+        <button class="btn" onclick="closeModal('fbMask')">取消</button>
+        <button class="btn-primary btn" onclick="submitFeedback()">提交反馈</button>
+      </div>
     </div>
   </div>
 </div>
@@ -598,7 +634,8 @@ function renderList(){
     return ''+
     '<div class="item" data-list-id="'+id+'">'+
       '<div class="item-head" data-head="'+id+'">'+
-        '<div class="item-top">'+tagType(d.reviewType)+tagRisk(d.reviewRisk)+conflictTag+'<span class="clause-no">'+d.clause+'</span>'+doneTag+'</div>'+
+        '<div class="item-top">'+tagType(d.reviewType)+tagRisk(d.reviewRisk)+conflictTag+'<span class="clause-no">'+d.clause+'</span>'+doneTag+
+          '<button class="fb-btn" type="button" data-fb="'+id+'" title="反馈本条 AI 识别结果（仅作归集线索）" onclick="event.stopPropagation();openFeedback(\''+id+'\')">AI 识别有误？反馈</button></div>'+
         '<div class="item-sum" data-sum="'+id+'">'+shortSum(id)+'</div>'+
       '</div>'+
       '<div class="detail" data-detail="'+id+'">'+
@@ -731,6 +768,8 @@ function applyPermissions(){
   document.querySelectorAll('[data-lock]').forEach(el=>el.style.display=edit?'none':'block');
   // 视图同步滚动开关在单栏模式禁用观感
   document.getElementById('syncSwitch').style.opacity = state.view==='single'?'.4':'';
+  // 新增：AI 识别结果反馈入口 —— 采购（只读）隐藏，法务 / 管理员可见
+  document.querySelectorAll('.fb-btn').forEach(el=>{ el.style.display = state.role==='procurement'?'none':''; });
 }
 
 /* ============ 事件绑定 ============ */
@@ -919,6 +958,52 @@ function loadApplies(){
 }
 function saveApplies(list){ try{ localStorage.setItem(APPLY_KEY,JSON.stringify(list)); return true; }catch(e){ return false; } }
 function nowStr(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); }
+
+/* ============ 新增：AI 识别结果反馈（仅归集打标，不改动模型 / 初判 / 标准条款库） ============
+   独立契约 CLM_AI_FEEDBACK_V1：只写反馈数据，与原有业务备注（复核意见 opinion、入库申请 CLM_RISK_APPLY_V1、
+   样本库 CLM_RISK_SAMPLE_V1）完全隔离；页面9 读取后归集为【用户反馈样本】并沿用原审批链路。
+   一期不做反馈统计看板、不做自动修正逻辑；样本来源（入库渠道）与来源合同（原始合同编号）分开表达。 */
+const AI_FEEDBACK_KEY='CLM_AI_FEEDBACK_V1';
+const FB_KIND_LABEL={pair_wrong:'配对错误',false_positive:'误报',missed:'漏识别'};
+function loadFeedbacks(){
+  try{ const raw=localStorage.getItem(AI_FEEDBACK_KEY); const a=raw?JSON.parse(raw):[]; return Array.isArray(a)?a:[]; }
+  catch(e){ return []; }
+}
+function saveFeedbacks(list){ try{ localStorage.setItem(AI_FEEDBACK_KEY,JSON.stringify(list)); return true; }catch(e){ return false; } }
+let fbDiffId='';
+function openFeedback(id){
+  if(state.role==='procurement'){ toast('采购专员无反馈权限'); return; }
+  const d=DIFFS[id]; if(!d) return;
+  fbDiffId=id;
+  document.getElementById('fbTitle').textContent='AI 识别结果反馈 · '+d.clause;
+  document.querySelectorAll('#fbMask input[name="fbKind"]').forEach(r=>{ r.checked=false; });
+  document.getElementById('fbNote').value='';
+  showModal('fbMask');
+}
+function submitFeedback(){
+  if(state.role==='procurement'){ toast('采购专员无反馈权限'); return; }
+  const d=DIFFS[fbDiffId]; if(!d){ closeModal('fbMask'); return; }
+  const checked=document.querySelector('#fbMask input[name="fbKind"]:checked');
+  if(!checked){ toast('请选择一种反馈类型'); return; }   // 唯一必选，无其他校验、无长表单
+  const note=document.getElementById('fbNote').value.trim();
+  const list=loadFeedbacks();
+  const t=nowStr();
+  const roleName={procurement:'采购专员',legal:'法务审核员',admin:'管理员'}[state.role];
+  list.push({
+    id:'FB-'+String(list.length+1).padStart(4,'0'),
+    sampleId:'RS-FB-'+fbDiffId,          // 稳定：同一差异只归集一条样本
+    diffId:fbDiffId, clause:d.clause, loc:d.loc,
+    contract:'HT-SUP-2026-001', baseCode:'HT-STD-2026-001',
+    sysType:TYPE_LABEL[d.sysType], sysRisk:d.sysRisk,
+    kind:checked.value, kindLabel:FB_KIND_LABEL[checked.value], note:note,
+    operator:roleName, operatorRole:state.role, time:t,
+    backendTag:'用户反馈样本', sampleSource:'feedback'
+  });
+  const okSave=saveFeedbacks(list);
+  closeModal('fbMask');
+  if(!okSave){ toast('本地存储不可用，反馈未保存'); return; }
+  toast('已提交反馈，样本已归集至风险条款库（仅作线索）');
+}
 function submitApplications(){
   if(!state.applySel.size) return 0;
   const list=loadApplies();
